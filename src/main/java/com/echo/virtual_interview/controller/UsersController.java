@@ -100,29 +100,27 @@ public class UsersController {
      */
     @PostMapping("/login")
     public BaseResponse<LoginResultVO> userLogin(@RequestBody UserLoginRequest userLoginRequest,
-                                               HttpServletRequest request) {
+                                                 HttpServletRequest request) {
         if (userLoginRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
 
         String password = userLoginRequest.getPassword();
-        String userName = userLoginRequest.getUsername();
-        String email = userLoginRequest.getEmail();
+        String usernameOrEmail = userLoginRequest.getUsernameOrEmail();
 
         // 验证密码不能为空
         if (StringUtils.isBlank(password)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码不能为空");
         }
 
-        // 验证用户名或邮箱至少提供一个
-        if (StringUtils.isAllBlank(userName, email)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或邮箱不能都为空");
+        // 验证用户名或邮箱不能为空
+        if (StringUtils.isBlank(usernameOrEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或邮箱不能为空");
         }
-
         // 调用服务层方法
-        LoginUserVO loginUserVO = userService.userLogin(userName, email, password, request);
+        LoginUserVO loginUserVO = userService.userLogin(usernameOrEmail, password, request);
         String token = jwtUtils.generateToken(String.valueOf(loginUserVO.getId()), loginUserVO.getUsername());
-        LoginResultVO  loginResultVO = new LoginResultVO();
+        LoginResultVO loginResultVO = new LoginResultVO();
         loginResultVO.setToken(token);
         loginResultVO.setUserInfo(loginUserVO);
         return ResultUtils.success(loginResultVO);

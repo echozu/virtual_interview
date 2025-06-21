@@ -93,15 +93,13 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     }
 
     @Override
-    public LoginUserVO userLogin(String userName, String email, String userPassword, HttpServletRequest request) {
+    public LoginUserVO userLogin(String usernameOrEmail, String userPassword, HttpServletRequest request) {
         // 1. 参数校验
         if (StringUtils.isBlank(userPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码不能为空");
         }
-
-        // 检查至少提供了用户名或邮箱
-        if (StringUtils.isAllBlank(userName, email)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或邮箱不能都为空");
+        if (StringUtils.isBlank(usernameOrEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或邮箱不能为空");
         }
 
         // 2. 密码长度校验
@@ -112,33 +110,30 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         // 3. 密码加密
         String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
 
-        // 4. 构建查询条件
+        // 4. 先尝试作为用户名查询
         QueryWrapper<Users> queryWrapper = new QueryWrapper<>();
-        queryWrapper.lambda().eq(Users::getPassword, encryptPassword);
+        queryWrapper.lambda()
+                .eq(Users::getUsername, usernameOrEmail)
+                .eq(Users::getPassword, encryptPassword);
 
-        // 根据提供的参数决定查询条件
-        if (StringUtils.isNotBlank(userName)) {
-            // 用户名登录
-            if (userName.length() < 4) {
-                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名长度不能少于4位");
-            }
-            queryWrapper.lambda().eq(Users::getUsername, userName);
-        } else {
-            // 邮箱登录
-            if (!email.matches("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$")) {
-                throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式不正确");
-            }
-            queryWrapper.lambda().eq(Users::getEmail, email);
+        Users user = this.baseMapper.selectOne(queryWrapper);
+
+        // 5. 如果用户名查询不到，尝试作为邮箱查询
+        if (user == null) {
+            queryWrapper = new QueryWrapper<>();
+            queryWrapper.lambda()
+                    .eq(Users::getEmail, usernameOrEmail)
+                    .eq(Users::getPassword, encryptPassword);
+            user = this.baseMapper.selectOne(queryWrapper);
         }
 
-        // 5. 查询用户
-        Users user = this.baseMapper.selectOne(queryWrapper);
+        // 6. 如果两种方式都查询不到用户
         if (user == null) {
             log.info("user login failed, credentials not match");
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或密码错误");
         }
 
-        // 6. 记录用户的登录态
+        // 7. 记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATE, user);
         return this.getLoginUserVO(user);
     }

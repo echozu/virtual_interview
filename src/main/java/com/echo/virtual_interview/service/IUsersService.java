@@ -37,7 +37,7 @@ public interface IUsersService extends IService<Users> {
      * @param request
      * @return 脱敏后的用户信息
      */
-    LoginUserVO userLogin(String username, String email,String password, HttpServletRequest request);
+    LoginUserVO userLogin(String usernameOrEmail,String password, HttpServletRequest request);
 
 
     /**
