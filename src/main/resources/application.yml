@@ -1,0 +1,100 @@
+server:
+  servlet:
+    context-path: /
+
+spring:
+  profiles:
+    active: prod #设置去导入dev的生成环境配置信息
+  # 支持 swagger3
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  main:
+    allow-circular-references: true
+  application:
+    name: virtual_interview
+  # Database Configuration
+  datasource:
+    driver-class-name: ${echo.datasource.driver-class-name}
+    url: jdbc:mysql://${echo.datasource.host}:${echo.datasource.port}/${echo.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${echo.datasource.username}
+    password: ${echo.datasource.password}
+    hikari:
+      max-lifetime: 600000 # 10分钟
+      idle-timeout: 300000 # 5分钟
+      minimum-idle: 5
+      maximum-pool-size: 10
+  # Redis Configuration
+  data:
+    redis:
+      host: ${echo.redis.host}
+      port: ${echo.redis.port}
+      database: ${echo.redis.database}
+      password: ${echo.redis.password}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  servlet:
+    multipart:
+      max-file-size: 100MB # 最大支持文件大小
+      max-request-size: 100MB # 最大支持请求大小
+  # Mail Configuration
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 3158779947@qq.com
+    password: ***REMOVED*** #授权码
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+    default-encoding: UTF-8
+# MyBatis Plus Configuration
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:/mapper/**/*.xml
+jwt:
+  secret: virtual_interview-website-jwt-secret-key-2025
+  expiration: 86400000 # 24 hours in milliseconds
+## Logging Configuration
+#logging:
+#  level:
+#    root: INFO
+#    org.springframework: DEBUG
+#    com.echo.virtual_interview: DEBUG
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+#    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+#  file:
+#    name: logs/application.log
+# Swagger Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  packages-to-scan: com.echo.virtual_interview.controller
+
+echo:
+  oss:
+    endpoint: ${echo.oss.endpoint}
+    access-key-id: ${echo.oss.access-key-id}
+    access-key-secret: ${echo.oss.access-key-secret}
+    bucket-name: ${echo.oss.bucket-name}

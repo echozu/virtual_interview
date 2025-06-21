@@ -1,0 +1,27 @@
+server:
+  port: 9527
+
+# 本地开发环境
+echo:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    host: localhost
+    port: 3306
+    database: virtual_interview_db
+    username: root
+    password: ***REMOVED***
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: ***REMOVED***
+    database: 0
+  oss:
+    endpoint: oss-cn-guangzhou.aliyuncs.com
+    access-key-id: ***REMOVED***
+    access-key-secret: ***REMOVED***
+    bucket-name: echo-interview
+
+
+
+
+
