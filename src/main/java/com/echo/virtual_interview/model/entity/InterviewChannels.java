@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import java.time.LocalDateTime;
 import java.io.Serializable;
 
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.SchemaProperty;
 import lombok.Data;
@@ -44,9 +45,6 @@ public class InterviewChannels implements Serializable {
     @SchemaProperty(name = "专业方向")
     private String major;
 
-    @SchemaProperty(name = "希望面试的知识点（JSON数组）")
-    private String topics;
-
     @SchemaProperty(name = "工作类型('校招','社招','实习','兼职','不限')")
     private String jobType;
 
@@ -69,11 +67,11 @@ public class InterviewChannels implements Serializable {
     private String visibility;
 
     @SchemaProperty(name = "是否被删除（软删除）")
+    @TableLogic
     private Boolean isDeleted;
 
     @SchemaProperty(name = "创建时间")
     @TableField(fill = FieldFill.INSERT) // <<--- 自动插入时间
-
     private LocalDateTime createdAt;
 
     @SchemaProperty(name = "频道封面URL")

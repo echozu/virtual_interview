@@ -2,4 +2,85 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.echo.virtual_interview.mapper.InterviewChannelsMapper">
 
+    <select id="selectChannelsByPage" resultType="com.echo.virtual_interview.model.entity.InterviewChannels">
+        SELECT
+        ic.*
+        FROM
+        interview_channels ic
+        <where>
+            ic.is_deleted = 0
+
+            <choose>
+                <when test="currentUserId != null">
+                    AND (ic.creator_id = #{currentUserId} OR ic.visibility = '公开')
+                </when>
+                <otherwise>
+                    AND ic.visibility = '公开'
+                </otherwise>
+            </choose>
+            <if test="filter.jobType != null and filter.jobType != '' and filter.jobType != '不限'">
+                AND ic.job_type = #{filter.jobType}
+            </if>
+            <if test="filter.interviewerStyle != null and filter.interviewerStyle != '' and filter.interviewerStyle != '随机'">
+                AND ic.interviewer_style = #{filter.interviewerStyle}
+            </if>
+            <if test="filter.interviewMode != null and filter.interviewMode != ''">
+                AND ic.interview_mode = #{filter.interviewMode}
+            </if>
+            <if test="filter.estimatedDuration != null and filter.estimatedDuration > 0">
+                AND ic.estimated_duration = #{filter.estimatedDuration}
+            </if>
+            <if test="filter.major != null and filter.major != ''">
+                AND ic.major LIKE CONCAT('%', #{filter.major}, '%')
+            </if>
+            <if test="filter.targetPosition != null and filter.targetPosition != ''">
+                AND ic.target_position LIKE CONCAT('%', #{filter.targetPosition}, '%')
+            </if>
+            <if test="filter.targetCompany != null and filter.targetCompany != ''">
+                AND ic.target_company LIKE CONCAT('%', #{filter.targetCompany}, '%')
+            </if>
+
+            <if test="topicList != null and !topicList.isEmpty()">
+                AND ic.id IN (
+                SELECT
+                ct.channel_id
+                FROM
+                channel_topics ct
+                LEFT JOIN topics t ON ct.topic_id = t.id
+                WHERE
+                t.name IN
+                <foreach collection="topicList" item="topicName" open="(" separator="," close=")">
+                    #{topicName}
+                </foreach>
+                GROUP BY
+                ct.channel_id
+                HAVING
+                COUNT(DISTINCT t.id) = #{topicCount}
+                )
+            </if>
+        </where>
+
+        <if test="filter.usageCountSort != null and filter.usageCountSort != ''">
+            <if test="filter.usageCountSort == '正序'">
+                ORDER BY ic.usage_count ASC
+            </if>
+            <if test="filter.usageCountSort == '倒序'">
+                ORDER BY ic.usage_count DESC
+            </if>
+        </if>
+        <if test="filter.usageCountSort == null or filter.usageCountSort == ''">
+            ORDER BY ic.created_at DESC
+        </if>
+    </select>
+
+
+    <select id="selectTopicNamesByChannelId" resultType="java.lang.String">
+        SELECT
+            t.name
+        FROM
+            topics t
+                LEFT JOIN channel_topics ct ON t.id = ct.topic_id
+        WHERE
+            ct.channel_id = #{channelId}
+    </select>
 </mapper>

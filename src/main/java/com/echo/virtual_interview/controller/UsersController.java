@@ -149,7 +149,7 @@ public class UsersController {
      */
     @GetMapping("/get/message")
     public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
-        Users user = userService.getLoginUser(request);
+        Users user = userService.getLoginUser();
         return ResultUtils.success(userService.getLoginUserVO(user));
     }
 
@@ -166,7 +166,7 @@ public class UsersController {
         if (userUpdateMyRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        Users loginUser = userService.getLoginUser(request);
+        Users loginUser = userService.getLoginUser();
         Users user = new Users();
         BeanUtils.copyProperties(userUpdateMyRequest, user);
         user.setId(loginUser.getId());

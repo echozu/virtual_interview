@@ -46,7 +46,7 @@ public interface IUsersService extends IService<Users> {
      * @param request
      * @return
      */
-    Users getLoginUser(HttpServletRequest request);
+    Users getLoginUser();
 
     /**
      * 获取当前登录用户（允许未登录）

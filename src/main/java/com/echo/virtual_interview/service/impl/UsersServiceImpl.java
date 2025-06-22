@@ -141,11 +141,10 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     /**
      * 获取当前登录用户
      *
-     * @param request
      * @return
      */
     @Override
-    public Users getLoginUser(HttpServletRequest request) {
+    public Users getLoginUser() {
         Integer userId = UserIdContext.getUserIdContext();
         Users currentUser = this.getById(userId);
         if (currentUser == null) {
