@@ -1,33 +1,52 @@
+# ===================================================================
+# 由 Spring Initializr 生成的注释，说明文件作用
+# ===================================================================
 HELP.md
 target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
 
-### STS ###
+# ===================================================================
+# 日志文件和临时文件
+# ===================================================================
+*.log
+*.tmp
+*.temp
+
+# ===================================================================
+# IDEs: IntelliJ IDEA, Eclipse/STS, VS Code
+# 统一忽略所有主流IDE的配置文件
+# ===================================================================
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Eclipse / Spring Tool Suite
 .apt_generated
 .classpath
 .factorypath
 .project
-.settings
+.settings/
+.sts4-cache/
 .springBeans
-.sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
+# VS Code
 .vscode/
+
+# ===================================================================
+# Maven & Gradle
+# ===================================================================
+# 忽略由 `mvn package` 创建的包
+*.jar
+*.war
+*.ear
+
+# 忽略 Maven 运行产生的 surefire-reports
+/target/surefire-reports/
+
+# ===================================================================
+# 操作系统特定文件
+# ===================================================================
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

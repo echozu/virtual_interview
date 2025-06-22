@@ -9,6 +9,8 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+#  jackson:
+#    property-naming-strategy: SNAKE_CASE # 让Jackson自动将JSON的snake_case映射到Java的camelCase
   main:
     allow-circular-references: true
   application:

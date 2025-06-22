@@ -130,7 +130,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         // 6. 如果两种方式都查询不到用户
         if (user == null) {
             log.info("user login failed, credentials not match");
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或密码错误");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在或密码错误");
         }
 
         // 7. 记录用户的登录态

@@ -1,8 +1,7 @@
 package com.echo.virtual_interview.model.entity;
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.*;
+
 import java.time.LocalDateTime;
 import java.io.Serializable;
 
@@ -49,10 +48,12 @@ public class Users implements Serializable {
     private String avatarUrl;
 
     @SchemaProperty(name = "创建时间")
-    private LocalDateTime createdTime;
+    @TableField(fill = FieldFill.INSERT) // <<--- 添加此注解
+    private LocalDateTime createdAt;
 
     @SchemaProperty(name = "更新时间")
-    private LocalDateTime updatedTime;
+    @TableField(fill = FieldFill.INSERT_UPDATE) // <<--- 添加此注解
+    private LocalDateTime updatedAt;
 
     @SchemaProperty(name = "用户角色：user/admin/ban")
     private String role;

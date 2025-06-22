@@ -1,8 +1,7 @@
 package com.echo.virtual_interview.model.entity;
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.*;
+
 import java.time.LocalDateTime;
 import java.io.Serializable;
 
@@ -73,12 +72,15 @@ public class InterviewChannels implements Serializable {
     private Boolean isDeleted;
 
     @SchemaProperty(name = "创建时间")
+    @TableField(fill = FieldFill.INSERT) // <<--- 自动插入时间
+
     private LocalDateTime createdAt;
 
     @SchemaProperty(name = "频道封面URL")
     private String imageUrl;
 
     @SchemaProperty(name = "更新时间")
+    @TableField(fill = FieldFill.INSERT_UPDATE) // <<--- 添加此注解
     private LocalDateTime updatedAt;
 
     @SchemaProperty(name = "频道使用次数-表示受欢迎程度，可以根据这个排序")
