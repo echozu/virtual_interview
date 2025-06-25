@@ -68,10 +68,10 @@ public class InterviewChannelsServiceImpl extends ServiceImpl<InterviewChannelsM
         filterMap.put("应聘岗位", positions);
         filterMap.put("专业方向", majors);
         filterMap.put("应聘公司", companies);
-        filterMap.put("面试官风格", interviewerStyles);
+        filterMap.put("考官风格", interviewerStyles);
         filterMap.put("面试形式", interviewModes);
-        filterMap.put("预计面试时长", durations);
-        filterMap.put("希望面试的知识点", topics);
+        filterMap.put("面试时长", durations);
+        filterMap.put("考察重点", topics);
         filterMap.put("热门排行", usageCountSortOptions);
 
         return filterMap;

@@ -76,7 +76,7 @@ import java.io.ByteArrayInputStream;
         }
 
     /**
-     * 上传频道的用户头像
+     * 上传用户头像、简历图片
      * @param file
      * @param request
      * @return

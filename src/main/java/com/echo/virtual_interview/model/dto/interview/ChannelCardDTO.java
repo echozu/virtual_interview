@@ -11,4 +11,8 @@ public class ChannelCardDTO {
     private String targetPosition;
     private Integer estimatedDuration;
     private Integer usageCount;
+    //新增的字段
+    private String jobType;
+    private String interviewerStyle;
+    private String interviewMode;
 }

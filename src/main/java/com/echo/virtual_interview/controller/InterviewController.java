@@ -1,78 +1,50 @@
 package com.echo.virtual_interview.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.echo.virtual_interview.common.BaseResponse;
-import com.echo.virtual_interview.common.ErrorCode;
-import com.echo.virtual_interview.common.ResultUtils;
-import com.echo.virtual_interview.context.UserIdContext;
-import com.echo.virtual_interview.model.dto.interview.ChannelCardDTO;
-import com.echo.virtual_interview.model.dto.interview.ChannelCreateDTO;
-import com.echo.virtual_interview.model.dto.interview.ChannelDetailDTO;
-import com.echo.virtual_interview.model.dto.interview.ChannelFilterDTO;
-import com.echo.virtual_interview.model.entity.InterviewChannels;
-import com.echo.virtual_interview.service.IInterviewChannelsService;
+import com.echo.virtual_interview.controller.ai.InterviewExpert;
 import jakarta.annotation.Resource;
-import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
 /**
- * 面试频道接口
+ * 面试接口
  */
 @RestController
 @RequestMapping("/api/interview")
 @Slf4j
 public class InterviewController {
 
+
     @Resource
-    private final IInterviewChannelsService interviewChannelService;
+    private ChatModel chatModel;
+    @Resource
+    private InterviewExpert interviewExpert;
 
-    public InterviewController(IInterviewChannelsService interviewChannelService) {
-        this.interviewChannelService = interviewChannelService;
+    /**
+     * 同步调用
+     *
+     * @param message
+     * @param chatId
+     * @return
+     */
+    @GetMapping("/chat/sync")
+    public String doChatWithLoveAppSync(String message, String chatId) {
+        return interviewExpert.dochat(message, chatId);
     }
 
     /**
-     * 获取筛选分类信息
+     * SSE 流式调用 AI 恋爱大师应用
+     *
+     * @param message
+     * @param chatId
+     * @return
      */
-    @GetMapping("/channel/filters")
-    public BaseResponse<Map<String, Object>> getFilterOptions() {
-        return ResultUtils.success(interviewChannelService.getFilterOptions());
-    }
-
-    /**
-     * 分页筛选面试频道卡片
-     * GET /api/interview/channel?pageNum=1&pageSize=10&jobType=校招&usageCountSort=desc
-     */
-    @GetMapping("/channel")
-    public BaseResponse<Page<ChannelCardDTO>> listChannels(ChannelFilterDTO filterDTO) {
-        Page<ChannelCardDTO> page = interviewChannelService.listChannelsByPage(filterDTO);
-        return ResultUtils.success(page);
-    }
-
-    /**
-     * 获取指定ID的频道详细信息
-     * GET /api/interview/channels/{id}
-     */
-    @GetMapping("/channel/{id}")
-    public BaseResponse<ChannelDetailDTO> getChannelDetails(@PathVariable Long id) {
-        ChannelDetailDTO channel = interviewChannelService.getChannelDetails(id);
-        if (channel != null) {
-            return ResultUtils.success(channel);
-        }
-        return ResultUtils.error(ErrorCode.PARAMS_ERROR);
-    }
-
-    /**
-     * 用户创建自定义频道
-     * POST /api/interview-channels
-     */
-    @PostMapping
-    public ResponseEntity<InterviewChannels> createChannel(@Valid @RequestBody ChannelCreateDTO createDTO) {
-        Integer userIdContext = UserIdContext.getUserIdContext();
-        InterviewChannels createdChannel = interviewChannelService.createChannel(createDTO, Long.valueOf(userIdContext));
-        return ResponseEntity.ok(createdChannel);
+    @GetMapping(value = "/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> doChatWithLoveAppSSE(String message, String chatId) {
+        return interviewExpert.doChatByStream(message, chatId);
     }
 }

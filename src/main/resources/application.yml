@@ -2,6 +2,7 @@ server:
   servlet:
     context-path: /
 
+
 spring:
   profiles:
     active: prod #设置去导入dev的生成环境配置信息
@@ -58,6 +59,7 @@ spring:
             enable: true
             required: true
     default-encoding: UTF-8
+
 # MyBatis Plus Configuration
 mybatis-plus:
   configuration:
@@ -100,3 +102,10 @@ echo:
     access-key-id: ${echo.oss.access-key-id}
     access-key-secret: ${echo.oss.access-key-secret}
     bucket-name: ${echo.oss.bucket-name}
+
+
+xunfei:
+  api:
+    key: "***REMOVED***"
+    url: "https://spark-api-open.xf-yun.com/v1/chat/completions"
+    model: "generalv3"

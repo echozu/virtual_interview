@@ -2,10 +2,12 @@ package com.echo.virtual_interview.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.echo.virtual_interview.adapater.ResumeAdapter;
 import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.constant.ModuleTypeConstants;
 import com.echo.virtual_interview.exception.BusinessException;
 import com.echo.virtual_interview.mapper.ResumeMapper;
+import com.echo.virtual_interview.model.dto.interview.andriod.ResumeData;
 import com.echo.virtual_interview.model.dto.resum.BasicInfoDto;
 import com.echo.virtual_interview.model.dto.resum.BasicInfoItemDto;
 import com.echo.virtual_interview.model.dto.resum.OtherInfoDto;
@@ -20,10 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -171,5 +170,40 @@ public class ResumeServiceImpl extends ServiceImpl<ResumeMapper, Resume> impleme
         if (title.contains("荣誉证书")) return ModuleTypeConstants.HONOR;
         if (title.contains("个人评价")) return ModuleTypeConstants.EVALUATION;
         return ModuleTypeConstants.PROJECT;
+    }
+
+
+    /**
+     * 安卓端-保存或更新简历
+     *
+     * @param androidResumeData 安卓端简历的完整数据
+     * @param userId            当前登录用户ID
+     */
+    @Override
+    public void androidSaveOrUpdateResume(ResumeData androidResumeData, Integer userId) {
+        // 1. 调用适配器，将安卓 DTO 转换为 Web 通用 DTO
+        ResumeDataDto webDto = ResumeAdapter.convertToWebDto(androidResumeData);
+
+        // 2. 调用已有的核心服务，完成数据库操作
+        this.saveOrUpdateResume(webDto, userId);
+    }
+
+    /**
+     * 安卓端-根据当前登录用户信息获取简历
+     *
+     * @param userId 当前登录用户ID
+     * @return 组装好的安卓端简历数据
+     */
+    @Override
+    public ResumeData androidGetResumeByUserId(Integer userId) {
+        // 1. 调用核心服务，获取 Web 通用 DTO
+        ResumeDataDto webDto = getResumeByUserId(userId);
+        if (webDto == null) {
+            return new ResumeData(); // 或者根据业务需求返回 null 或抛出异常
+        }
+
+        // 2. 调用适配器，将 Web 通用 DTO 转换为安卓 DTO
+        // 注意：如适配器中所述，此处的逆向转换可能不是100%完美的
+        return ResumeAdapter.convertToAndroidDto(webDto);
     }
 }
