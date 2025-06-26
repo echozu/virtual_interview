@@ -1,6 +1,5 @@
-package com.echo.virtual_interview.config;
+package com.echo.virtual_interview.controller.ai.config;
 
-import com.echo.virtual_interview.constant.XunFeiProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 

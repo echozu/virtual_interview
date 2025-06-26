@@ -1,4 +1,4 @@
-package com.echo.virtual_interview.constant;
+package com.echo.virtual_interview.controller.ai.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

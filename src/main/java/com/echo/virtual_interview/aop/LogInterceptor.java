@@ -25,43 +25,51 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class LogInterceptor {
 
     /**
-     * 拦截 Controller 包下所有方法
+     * 拦截 Controller 包下所有方法（包括 REST 接口和 STOMP 消息处理器）
      */
-    @Around("execution(* com.echo.virtual_interview.controller.*.*(..))")
+    @Around("execution(* com.echo.virtual_interview.controller..*(..))")
     public Object doInterceptor(ProceedingJoinPoint point) throws Throwable {
         // 创建计时器，用于统计请求耗时
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
 
-        // 获取当前请求对象
-        RequestAttributes requestAttributes = RequestContextHolder.currentRequestAttributes();
-        HttpServletRequest httpServletRequest = ((ServletRequestAttributes) requestAttributes).getRequest();
+        String requestId = UUID.randomUUID().toString(); // 请求唯一ID
+        String url = "unknown"; // 请求路径默认值
+        String ip = "unknown";  // IP 默认值
 
-        // 生成唯一的请求 ID，方便日志追踪
-        String requestId = UUID.randomUUID().toString();
+        // 是否 HTTP 请求标识
+        boolean isHttpRequest = true;
 
-        // 获取请求路径
-        String url = httpServletRequest.getRequestURI();
+        try {
+            // 如果当前线程绑定了 HTTP 请求，则记录请求信息
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpServletRequest request = attributes.getRequest();
+            url = request.getRequestURI();
+            ip = request.getRemoteHost();
+        } catch (IllegalStateException e) {
+            // 当前不是 HTTP 请求，如 STOMP/WebSocket 消息，不处理 request 信息
+            isHttpRequest = false;
+            log.debug("非 HTTP 请求，跳过 request 信息记录");
+        }
 
-        // 获取请求参数
+        // 获取请求参数（WebSocket 下仍然能获取）
         Object[] args = point.getArgs();
         String reqParam = "[" + StringUtils.join(args, ", ") + "]";
 
-        // 打印请求日志：请求 ID，请求路径，请求 IP，请求参数
-        log.info("request start，id: {}, path: {}, ip: {}, params: {}", requestId, url,
-                httpServletRequest.getRemoteHost(), reqParam);
+        // 打印请求日志
+        log.info("request start，id: {}, isHttp: {}, path: {}, ip: {}, params: {}",
+                requestId, isHttpRequest, url, ip, reqParam);
 
-        // 执行原方法（即实际的 Controller 方法）
+        // 执行目标方法
         Object result = point.proceed();
 
         // 停止计时
         stopWatch.stop();
         long totalTimeMillis = stopWatch.getTotalTimeMillis();
 
-        // 打印响应日志：请求 ID，请求耗时
+        // 打印响应日志
         log.info("request end, id: {}, cost: {}ms", requestId, totalTimeMillis);
 
-        // 返回原方法的返回值
         return result;
     }
 }

@@ -1,6 +1,6 @@
 package com.echo.virtual_interview.controller.ai.model;
 
-import com.echo.virtual_interview.constant.XunFeiProperties;
+import com.echo.virtual_interview.controller.ai.config.XunFeiProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

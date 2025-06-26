@@ -29,26 +29,25 @@ public class IInterviewServiceImpl implements IInterviewService {
     @Resource
     private InterviewExpert interviewExpert;
     @Override
-    public Flux<String> interviewProcess(String message, String sessionId) {
-        Integer userId = UserIdContext.getUserIdContext();
-
-        // 1. 获取简历信息
+    public Flux<String> interviewProcess(String message, String sessionId, Integer userId) {
+        // 1. 获取简历
         ResumeDataDto resume = resumeService.getResumeByUserId(userId);
-        Long resumeId= resumeService.getResumeIdByUserId(userId);
-        //根据简历id获取对应的model
+        Long resumeId = resumeService.getResumeIdByUserId(userId);
         List<ResumeModule> resumeModules = resumeModuleService.getResumeModulesByResumId(resumeId);
 
-        // 2. 获取面试会话
+        // 2. 会话校验
         InterviewSessions session = sessionsService.getById(sessionId);
         if (session == null) {
             return Flux.error(new IllegalArgumentException("无效的会话ID"));
         }
 
-        // 3. 获取频道信息
+        // 3. 频道信息
         ChannelDetailDTO channel = channelsService.getChannelDetailsNoAdd(session.getChannelId());
-        // 4. 调用 AI 对话（注入上下文）
-        return interviewExpert.doChatByStreamWithProcess(message, sessionId, resume,resumeModules,channel);
+
+        // 4. AI 对话处理（流式返回）
+        return interviewExpert.doChatByStreamWithProcess(message, sessionId, resume, resumeModules, channel);
     }
+
 
 
 

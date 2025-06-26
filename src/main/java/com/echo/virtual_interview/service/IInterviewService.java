@@ -3,5 +3,5 @@ package com.echo.virtual_interview.service;
 import reactor.core.publisher.Flux;
 
 public interface IInterviewService {
-    Flux<String> interviewProcess(String message, String chatId);
+    Flux<String> interviewProcess(String message, String chatId, Integer userId);
 }
