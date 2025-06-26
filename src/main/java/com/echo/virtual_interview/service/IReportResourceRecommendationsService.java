@@ -2,6 +2,8 @@ package com.echo.virtual_interview.service;
 
 import com.echo.virtual_interview.model.entity.ReportResourceRecommendations;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.echo.virtual_interview.service.impl.ResumeServiceImpl;
+import jakarta.annotation.Resource;
 
 /**
  * <p>

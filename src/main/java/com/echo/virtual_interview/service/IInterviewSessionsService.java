@@ -1,7 +1,9 @@
 package com.echo.virtual_interview.service;
 
+import com.echo.virtual_interview.common.BaseResponse;
 import com.echo.virtual_interview.model.entity.InterviewSessions;
 import com.baomidou.mybatisplus.extension.service.IService;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * <p>
@@ -12,5 +14,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
  * @since 2025-06-20
  */
 public interface IInterviewSessionsService extends IService<InterviewSessions> {
+
+    String start(@NotBlank Long channelId);
 
 }

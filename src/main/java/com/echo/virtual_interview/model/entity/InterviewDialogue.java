@@ -34,7 +34,7 @@ public class InterviewDialogue implements Serializable {
     private Long id;
 
     @SchemaProperty(name = "所属面试会话ID")
-    private Long sessionId;
+    private String sessionId;
 
     @SchemaProperty(name = "对话顺序（如1、2、3）")
     private Integer sequence;

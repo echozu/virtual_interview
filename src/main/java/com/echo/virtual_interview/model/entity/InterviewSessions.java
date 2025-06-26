@@ -31,8 +31,8 @@ public class InterviewSessions implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @SchemaProperty(name = "会话唯一ID")
-    @TableId(value = "id", type = IdType.AUTO)
-    private Long id;
+    @TableId(value = "id")
+    private String id;
 
     @SchemaProperty(name = "参与面试的用户ID")
     private Long userId;

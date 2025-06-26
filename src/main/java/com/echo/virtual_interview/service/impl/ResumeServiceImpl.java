@@ -18,6 +18,7 @@ import com.echo.virtual_interview.service.IResumeModuleService;
 import com.echo.virtual_interview.service.IResumeService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -39,6 +40,8 @@ public class ResumeServiceImpl extends ServiceImpl<ResumeMapper, Resume> impleme
 
     @Resource
     private IResumeModuleService resumeModuleService;
+    @Autowired
+    private ResumeMapper resumeMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -171,14 +174,21 @@ public class ResumeServiceImpl extends ServiceImpl<ResumeMapper, Resume> impleme
         if (title.contains("个人评价")) return ModuleTypeConstants.EVALUATION;
         return ModuleTypeConstants.PROJECT;
     }
+    public Long getResumeIdByUserId(Integer userId) {
+        Resume resume = resumeMapper.selectOne(
+                new QueryWrapper<Resume>().lambda().eq(Resume::getUserId, userId)
+        );
+        return resume == null ? null : resume.getId();
+    }
 
 
-    /**
-     * 安卓端-保存或更新简历
-     *
-     * @param androidResumeData 安卓端简历的完整数据
-     * @param userId            当前登录用户ID
-     */
+
+        /**
+         * 安卓端-保存或更新简历
+         *
+         * @param androidResumeData 安卓端简历的完整数据
+         * @param userId            当前登录用户ID
+         */
     @Override
     public void androidSaveOrUpdateResume(ResumeData androidResumeData, Integer userId) {
         // 1. 调用适配器，将安卓 DTO 转换为 Web 通用 DTO

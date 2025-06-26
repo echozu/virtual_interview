@@ -32,8 +32,11 @@ public interface IInterviewChannelsService extends IService<InterviewChannels> {
     /**
      * 获取频道详细信息
      */
-    ChannelDetailDTO getChannelDetails(Long id); // <-- 修改返回类型
-
+    ChannelDetailDTO getChannelDetails(Long id);
+    /**
+     * 获取频道详细信息，不用加一版本
+     */
+    ChannelDetailDTO getChannelDetailsNoAdd(Long id);
     /**
      * 功能 3: 创建自定义面试频道
      */

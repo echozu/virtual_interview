@@ -140,7 +140,30 @@ public class InterviewChannelsServiceImpl extends ServiceImpl<InterviewChannelsM
         // 6. 返回包含完整信息的 DTO
         return detailDTO;
     }
+    @Override
+    public ChannelDetailDTO getChannelDetailsNoAdd(Long id) { // 【修改】返回类型为 ChannelDetailDTO
+        // 1. 查询频道主体信息，这部分逻辑不变
+        InterviewChannels channel = this.baseMapper.selectById(id);
 
+        if(channel == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"频道不存在");
+        }
+
+        // 4. 【新增】调用新写的Mapper方法，查询该频道关联的所有topics
+        List<String> topicNames = this.baseMapper.selectTopicNamesByChannelId(id);
+
+        // 5. 【新增】组装最终的 DTO 对象
+        ChannelDetailDTO detailDTO = new ChannelDetailDTO();
+
+        // 5.1 从 entity 拷贝所有同名属性到 DTO
+        BeanUtils.copyProperties(channel, detailDTO);
+
+        // 5.2 将查询到的 topics 列表设置到 DTO 中
+        detailDTO.setTopics(topicNames);
+
+        // 6. 返回包含完整信息的 DTO
+        return detailDTO;
+    }
     @Override
     public InterviewChannels createChannel(ChannelCreateDTO createDTO, Long creatorId) {
         // 1. 创建并保存 InterviewChannel 主体

@@ -4,6 +4,9 @@ import com.echo.virtual_interview.model.dto.interview.andriod.ResumeData;
 import com.echo.virtual_interview.model.dto.resum.ResumeDataDto;
 import com.echo.virtual_interview.model.entity.Resume;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.echo.virtual_interview.model.entity.ResumeModule;
+
+import java.util.List;
 
 /**
  * <p>
@@ -27,6 +30,7 @@ public interface IResumeService extends IService<Resume> {
      * @return 组装好的简历数据
      */
     ResumeDataDto getResumeByUserId(Integer userId);
+
     /**
      * 安卓端-保存或更新简历
      * @param resumeData 安卓端简历的完整数据
@@ -40,4 +44,7 @@ public interface IResumeService extends IService<Resume> {
      * @return 组装好的安卓端简历数据
      */
     ResumeData androidGetResumeByUserId(Integer userId);
-   }
+    // 根据用户id获取简历id
+    Long getResumeIdByUserId(Integer userId);
+
+}
