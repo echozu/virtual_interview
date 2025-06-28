@@ -1,10 +1,10 @@
 package com.echo.virtual_interview.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.echo.virtual_interview.model.dto.interview.ChannelCardDTO;
-import com.echo.virtual_interview.model.dto.interview.ChannelCreateDTO;
-import com.echo.virtual_interview.model.dto.interview.ChannelDetailDTO;
-import com.echo.virtual_interview.model.dto.interview.ChannelFilterDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelCardDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelCreateDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelFilterDTO;
 import com.echo.virtual_interview.model.entity.InterviewChannels;
 import com.baomidou.mybatisplus.extension.service.IService;
 

@@ -1,6 +1,6 @@
 package com.echo.virtual_interview.adapater;
 
-import com.echo.virtual_interview.model.dto.interview.ChannelDetailDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
 import com.echo.virtual_interview.model.dto.resum.ResumeDataDto;
 import com.echo.virtual_interview.model.entity.ResumeModule;
 

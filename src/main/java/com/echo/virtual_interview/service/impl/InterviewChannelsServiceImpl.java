@@ -10,8 +10,10 @@ import com.echo.virtual_interview.exception.BusinessException;
 import com.echo.virtual_interview.mapper.ChannelTopicMapper;
 import com.echo.virtual_interview.mapper.InterviewChannelsMapper;
 import com.echo.virtual_interview.mapper.TopicMapper;
-import com.echo.virtual_interview.mapper.UsersMapper;
-import com.echo.virtual_interview.model.dto.interview.*;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelCardDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelCreateDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelFilterDTO;
 import com.echo.virtual_interview.model.entity.ChannelTopic;
 import com.echo.virtual_interview.model.entity.InterviewChannels;
 import com.echo.virtual_interview.model.entity.Topic;
@@ -22,9 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**

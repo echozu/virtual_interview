@@ -109,3 +109,7 @@ xunfei:
     key: "***REMOVED***"
     url: "https://spark-api-open.xf-yun.com/v1/chat/completions"
     model: "generalv3"
+  rtasr:
+    appid: "bbbfe203"
+    secret-key: "***REMOVED***"
+    host: "rtasr.xfyun.cn/v1/ws"

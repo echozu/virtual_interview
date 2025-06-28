@@ -1,6 +1,5 @@
-package com.echo.virtual_interview.controller.ws;
+package com.echo.virtual_interview.config.ws;
 
-import com.echo.virtual_interview.config.WebSocketAuthInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -21,14 +20,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws/interview")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+                .setAllowedOriginPatterns("*");
+//                .withSockJS();  // 去掉sockjs支持，方便直接传websocket
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/user");
+        // /topic 用于广播消息, /queue 用于点对点消息
+        registry.enableSimpleBroker("/topic", "/queue");
         registry.setApplicationDestinationPrefixes("/api");
+        // 当使用 convertAndSendToUser 时, Spring会自动加上这个前缀, 形成 /user/{userId}/queue/... 的最终地址
         registry.setUserDestinationPrefix("/user");
     }
 

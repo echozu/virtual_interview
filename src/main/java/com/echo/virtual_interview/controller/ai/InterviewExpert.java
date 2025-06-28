@@ -2,32 +2,22 @@ package com.echo.virtual_interview.controller.ai;
 
 import com.echo.virtual_interview.adapater.ResumeAndChannelAdapter;
 import com.echo.virtual_interview.controller.ai.advisor.MyLoggerAdvisor;
-import com.echo.virtual_interview.controller.ai.advisor.ReReadingAdvisor;
 import com.echo.virtual_interview.controller.ai.chatMemory.MysqlChatMemory;
 import com.echo.virtual_interview.controller.ai.model.XunFeiChatModel;
-import com.echo.virtual_interview.model.dto.interview.ChannelDetailDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
 import com.echo.virtual_interview.model.dto.resum.ResumeDataDto;
 import com.echo.virtual_interview.model.entity.ResumeModule;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.StreamingChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY;

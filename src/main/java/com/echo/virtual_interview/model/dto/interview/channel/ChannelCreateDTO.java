@@ -1,4 +1,4 @@
-package com.echo.virtual_interview.model.dto.interview;
+package com.echo.virtual_interview.model.dto.interview.channel;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

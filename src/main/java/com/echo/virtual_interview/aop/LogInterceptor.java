@@ -57,8 +57,8 @@ public class LogInterceptor {
         String reqParam = "[" + StringUtils.join(args, ", ") + "]";
 
         // 打印请求日志
-        log.info("request start，id: {}, isHttp: {}, path: {}, ip: {}, params: {}",
-                requestId, isHttpRequest, url, ip, reqParam);
+//        log.info("request start，id: {}, isHttp: {}, path: {}, ip: {}, params: {}",
+//                requestId, isHttpRequest, url, ip, reqParam);
 
         // 执行目标方法
         Object result = point.proceed();
@@ -68,7 +68,7 @@ public class LogInterceptor {
         long totalTimeMillis = stopWatch.getTotalTimeMillis();
 
         // 打印响应日志
-        log.info("request end, id: {}, cost: {}ms", requestId, totalTimeMillis);
+//        log.info("request end, id: {}, cost: {}ms", requestId, totalTimeMillis);
 
         return result;
     }

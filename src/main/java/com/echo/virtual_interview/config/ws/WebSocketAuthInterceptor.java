@@ -1,4 +1,4 @@
-package com.echo.virtual_interview.config;
+package com.echo.virtual_interview.config.ws;
 
 import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.utils.JwtUtils;

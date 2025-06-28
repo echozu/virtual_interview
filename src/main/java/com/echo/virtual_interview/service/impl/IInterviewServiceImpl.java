@@ -1,10 +1,8 @@
 package com.echo.virtual_interview.service.impl;
 
-import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.controller.ai.InterviewExpert;
-import com.echo.virtual_interview.model.dto.interview.ChannelDetailDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
 import com.echo.virtual_interview.model.dto.resum.ResumeDataDto;
-import com.echo.virtual_interview.model.entity.InterviewChannels;
 import com.echo.virtual_interview.model.entity.InterviewSessions;
 import com.echo.virtual_interview.model.entity.ResumeModule;
 import com.echo.virtual_interview.service.*;
@@ -45,6 +43,7 @@ public class IInterviewServiceImpl implements IInterviewService {
         ChannelDetailDTO channel = channelsService.getChannelDetailsNoAdd(session.getChannelId());
 
         // 4. AI 对话处理（流式返回）
+        System.out.println("用户信息："+message);
         return interviewExpert.doChatByStreamWithProcess(message, sessionId, resume, resumeModules, channel);
     }
 

@@ -1,7 +1,7 @@
 package com.echo.virtual_interview.mapper;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.echo.virtual_interview.model.dto.interview.ChannelFilterDTO;
+import com.echo.virtual_interview.model.dto.interview.channel.ChannelFilterDTO;
 import com.echo.virtual_interview.model.entity.InterviewChannels;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
