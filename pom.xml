@@ -148,7 +148,6 @@
             <version>1.0.0-M6</version>
         </dependency>
 
-
         <!-- 工具库（ObjectMapper 等） -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -176,21 +175,31 @@
             <artifactId>commons-codec</artifactId>
         </dependency>
 
-
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+    <!--语音合成的依赖-->
+        <!-- Gson -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>  <!-- 建议使用较新版本而非2.3.1 -->
+        </dependency>
 
+        <!-- OkHttp -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>  <!-- 建议使用较新版本而非3.14.2 -->
+        </dependency>
+
+        <!-- Apache POI -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>  <!-- 建议使用较新版本而非4.1.2 -->
+        </dependency>
     </dependencies>
 
 

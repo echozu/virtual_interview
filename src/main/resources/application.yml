@@ -113,3 +113,9 @@ xunfei:
     appid: "bbbfe203"
     secret-key: "***REMOVED***"
     host: "rtasr.xfyun.cn/v1/ws"
+  tts: # Text-To-Speech (语音合成) 配置
+    host: "cbm01.cn-huabei-1.xf-yun.com"
+    app-id: "bbbfe203"
+    api-key: "4f0311e6c8e3f9447384312cfa500194"
+    api-secret: "***REMOVED***"
+    vcn: "x5_lingfeiyi_flow" # 默认发音人，可以根据需求更改

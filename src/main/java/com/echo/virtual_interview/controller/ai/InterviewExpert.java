@@ -2,12 +2,10 @@ package com.echo.virtual_interview.controller.ai;
 
 import com.echo.virtual_interview.adapater.ResumeAndChannelAdapter;
 import com.echo.virtual_interview.controller.ai.advisor.MyLoggerAdvisor;
-import com.echo.virtual_interview.controller.ai.chatMemory.MysqlChatMemory;
-import com.echo.virtual_interview.controller.ai.model.XunFeiChatModel;
+import com.echo.virtual_interview.controller.ai.chatMemory.MysqlInterviewMemory;
 import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
 import com.echo.virtual_interview.model.dto.resum.ResumeDataDto;
 import com.echo.virtual_interview.model.entity.ResumeModule;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -27,10 +25,9 @@ import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvis
 @Slf4j
 public class InterviewExpert {
 
-    @Resource
-    private XunFeiChatModel xunFeiChatModel;  // 直接注入自定义模型
     private final ChatClient chatClient;
-
+    @Autowired
+    private final MysqlInterviewMemory mysqlInterviewMemory;
     private static final String SYSTEM_PROMPT = """
             你是一位专精于技术类岗位面试辅导的AI教练，具备丰富的大厂面试经验。
             - 识别内容阶段（如：自我介绍 / 项目经历 / 技术问答 / 行为问题等）；
@@ -40,21 +37,20 @@ public class InterviewExpert {
             - 最终生成“面试反馈报告”。
             请保持专业、鼓励性的语气，引导用户逐步提升。
             """;
-    @Autowired
-    private final MysqlChatMemory mysqlChatMemory;
+
 
     /**
      * 初始化 通用的ChatClient
      *
      * @param xunFeiChatModel
      */
-    public InterviewExpert(ChatModel xunFeiChatModel, MysqlChatMemory mysqlChatMemory) {
-        this.mysqlChatMemory = mysqlChatMemory;
+    public InterviewExpert(ChatModel xunFeiChatModel, MysqlInterviewMemory mysqlInterviewMemory) {
+        this.mysqlInterviewMemory = mysqlInterviewMemory;
         this.chatClient = ChatClient.builder(xunFeiChatModel)
-                .defaultSystem(SYSTEM_PROMPT)
+//                .defaultSystem(SYSTEM_PROMPT)  // 这里先不需要基础的聊天提示词，后面的client自己加即可
                 .defaultAdvisors(
                         // 支持数据库记忆
-                        new MessageChatMemoryAdvisor(mysqlChatMemory),
+                        new MessageChatMemoryAdvisor(mysqlInterviewMemory),
                         // 自定义日志 Advisor
                         new MyLoggerAdvisor()
                         // 增强advisor（即再读一次，耗费token和时间，但更准确）
@@ -63,49 +59,6 @@ public class InterviewExpert {
 
                 .build();
     }
-
-    /**
-     * 面试对话-非流式
-     * （带10条上下文记忆）
-     *
-     * @param message 用户信息
-     * @param chatId  会话id
-     * @return
-     */
-    public String dochat(String message, String chatId) {
-        ChatResponse response = chatClient.prompt()
-                // 传入用户的问题
-                .user(message)
-                // 这里再定义advisor顾问：这里设置10条上下文记忆：这里可以获得最近的n条消息是因为去手动实现了
-                // List<Message> get(String conversationId, int lastN);，然后这里是自动调用
-                .advisors(spec -> spec
-                        .param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
-                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
-                .call()
-                .chatResponse();
-        // 得到ai的回答
-        String content = response.getResult().getOutput().getText();
-        log.info("AI Response: {}", content);
-        return content;
-    }
-
-    /**
-     * AI 基础对话（支持多轮对话记忆，SSE 流式传输）
-     *
-     * @param message
-     * @param chatId
-     * @return
-     */
-    public Flux<String> doChatByStream(String message, String chatId) {
-        return chatClient
-                .prompt()
-                .user(message)
-                .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
-                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
-                .stream()
-                .content();
-    }
-
     /**
      * 面试过程的对话
      *
@@ -113,7 +66,7 @@ public class InterviewExpert {
      * @param chatId
      * @return
      */
-    public Flux<String> doChatByStreamWithProcess(
+    public Flux<String> aiInterviewByStreamWithProcess(
             String message,
             String chatId,
             ResumeDataDto resume,
@@ -179,4 +132,52 @@ public class InterviewExpert {
                 .map(ResumeModule::getContent)
                 .orElse("相关技术");
     }
+
+
+
+
+
+
+
+/*    *//**
+     * 面试对话-非流式（未用）
+     * （带10条上下文记忆）
+     *
+     * @param message 用户信息
+     * @param sessionId  会话id
+     * @return
+     *//*
+    public String dochat(String message, String sessionId) {
+        ChatResponse response = chatClient.prompt()
+                // 传入用户的问题
+                .user(message)
+                // 这里再定义advisor顾问：这里设置10条上下文记忆：这里可以获得最近的n条消息是因为去手动实现了
+                // List<Message> get(String conversationId, int lastN);，然后这里是自动调用
+                .advisors(spec -> spec
+                        .param(CHAT_MEMORY_CONVERSATION_ID_KEY, sessionId)
+                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
+                .call()
+                .chatResponse();
+        // 得到ai的回答
+        String content = response.getResult().getOutput().getText();
+        log.info("AI Response: {}", content);
+        return content;
+    }
+
+    *//**
+     * AI 基础对话（支持多轮对话记忆，SSE 流式传输）（未用）
+     *
+     * @param message
+     * @param sessionId
+     * @return
+     *//*
+    public Flux<String> doChatByStream(String message, String sessionId) {
+        return chatClient
+                .prompt()
+                .user(message)
+                .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, sessionId)
+                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 15))
+                .stream()
+                .content();
+    }*/
 }

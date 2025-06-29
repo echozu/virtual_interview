@@ -6,7 +6,7 @@ import com.echo.virtual_interview.model.dto.interview.audio.AudioChunkDto;
 import com.echo.virtual_interview.model.dto.interview.ChatMessage;
 import com.echo.virtual_interview.service.IInterviewService;
 import com.echo.virtual_interview.service.IInterviewSessionsService;
-import com.echo.virtual_interview.utils.rtasr.AsrProcessingService;
+import com.echo.virtual_interview.service.impl.AsrProcessingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
@@ -48,7 +48,7 @@ public class InterviewWsController {
      * 面试过程-websocket-文字版
      * 注意：为了与音频接口保持一致，路径最好也统一
      */
-    @MessageMapping("/interview/chat/{sessionId}") // 建议路径: /interview/chat/{sessionId}
+    @MessageMapping("/interview/process/{sessionId}")
     public void handleUserMessage(
             @DestinationVariable String sessionId,
             @Payload ChatMessage message,
@@ -61,7 +61,7 @@ public class InterviewWsController {
                     .subscribe(reply -> {
                         messagingTemplate.convertAndSendToUser(
                                 userId.toString(),
-                                "/queue/interview/answer", // 已修正为/queue，与前端订阅地址匹配
+                                "/queue/interview/answer", // 与前端订阅地址匹配
                                 new ChatMessage("AI", reply)
                         );
                     });
@@ -71,10 +71,10 @@ public class InterviewWsController {
     }
 
     /**
-     * 【已修改】处理前端发送的音频流数据
+     * 处理前端发送的音频流数据，并返回流式文本
      * 现在接收一个包含Base64音频字符串的DTO
      */
-    @MessageMapping("/interview/audio/{sessionId}")
+    @MessageMapping("/interview/process/audio/{sessionId}")
     public void handleAudioChunk(
             @DestinationVariable String sessionId,
             @Payload AudioChunkDto chunkDto, // <-- 修改点：使用DTO接收
@@ -94,12 +94,35 @@ public class InterviewWsController {
             log.error("Base64解码音频数据失败: {}", e.getMessage());
         }
     }
+    /**语音--文本（ai）---语音
+     * 处理前端发送的音频流数据，并返回流式音频
+     * 现在接收一个包含Base64音频字符串的DTO
+     */
+    @MessageMapping("/interview/process/audio/tts/{sessionId}")
+    public void handleAudioChunkTTS(
+            @DestinationVariable String sessionId,
+            @Payload AudioChunkDto chunkDto, // <-- 修改点：使用DTO接收
+            @Header("user-id") String userIdStr) {
+        try {
+            Integer userId = Integer.parseInt(userIdStr);
 
+            // --- 新增：从Base64解码回原始的byte[] ---
+            byte[] audioData = Base64.getDecoder().decode(chunkDto.getAudio());
+
+            log.trace("收到来自用户 {} 会话 {} 的音频数据，解码后大小: {} bytes", userId, sessionId, audioData.length);
+            asrProcessingService.processAudioChunkTTS(sessionId, userId, audioData);
+        } catch (NumberFormatException e) {
+            log.error("无效的用户ID格式: {}", userIdStr);
+        } catch (IllegalArgumentException e) {
+            // 如果Base64字符串格式不正确，会抛出此异常
+            log.error("Base64解码音频数据失败: {}", e.getMessage());
+        }
+    }
     /**
      * 处理前端发送的音频结束信号
-     * 前端应发送到: /api/interview/audio/end/{sessionId}
+     * 前端应发送到: /api/interview/process/audio/end/{sessionId}
      */
-    @MessageMapping("/interview/audio/end/{sessionId}")
+    @MessageMapping("/interview/process/audio/end/{sessionId}")
     public void handleAudioEnd(
             @DestinationVariable String sessionId,
             @Header("user-id") String userIdStr) {
@@ -113,5 +136,5 @@ public class InterviewWsController {
 前端依然通过 ws://localhost:9527/ws/interview 这个地址发起WebSocket连接。
 
 音频发送地址 (不变):
-前端依然向 /api/interview/audio/{sessionId} 这个目标地址发送音频数据。
+前端依然向 /api/interview/process/audio/{sessionId} 这个目标地址发送音频数据。
 * */

@@ -42,9 +42,9 @@ public class IInterviewServiceImpl implements IInterviewService {
         // 3. 频道信息
         ChannelDetailDTO channel = channelsService.getChannelDetailsNoAdd(session.getChannelId());
 
-        // 4. AI 对话处理（流式返回）
+        // 4. AI 处理（流式返回）
         System.out.println("用户信息："+message);
-        return interviewExpert.doChatByStreamWithProcess(message, sessionId, resume, resumeModules, channel);
+        return interviewExpert.aiInterviewByStreamWithProcess(message, sessionId, resume, resumeModules, channel);
     }
 
 
