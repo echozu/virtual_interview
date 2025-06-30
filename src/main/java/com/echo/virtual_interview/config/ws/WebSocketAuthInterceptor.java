@@ -33,7 +33,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                 token = token.substring(7);
                 if (jwtUtils.validateToken(token)) {
                     String userId = jwtUtils.getUserIdFromToken(token);
-
+                    accessor.setUser(new StompPrincipal(userId));
                     // 存入header（推荐） 不能存入context，因为是不同线程
                     accessor.setHeader("user-id", userId);
                     accessor.setLeaveMutable(true);

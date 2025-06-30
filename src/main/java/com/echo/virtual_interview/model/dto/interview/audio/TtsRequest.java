@@ -22,18 +22,39 @@ public class TtsRequest {
      * @return 构建好的请求对象
      */
     public static TtsRequest defaultSingleRequest(String appId, String vcn, String text) {
-        String encodedText = Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
+        // 确保文本不超过限制
+        if (text.length() > 300) {
+            text = text.substring(0, 300) + "...";
+        }
 
         return TtsRequest.builder()
-                .header(Header.builder().app_id(appId).build())
+                .header(Header.builder()
+                        .app_id(appId)
+                        .status(2)
+                        .build())
                 .parameter(Parameter.builder()
                         .tts(Tts.builder()
                                 .vcn(vcn)
-                                .audio(Audio.builder().encoding("lame").sample_rate(24000).build())
+                                .speed(50)
+                                .volume(50)
+                                .pitch(50)
+                                .audio(Audio.builder()
+                                        .encoding("lame")
+                                        .sample_rate(24000)
+                                        .channels(1)
+                                        .bit_depth(16)
+                                        .build())
                                 .build())
                         .build())
                 .payload(Payload.builder()
-                        .text(Text.builder().text(encodedText).build())
+                        .text(Text.builder()
+                                .encoding("utf8")
+                                .compress("raw")
+                                .format("plain")
+                                .status(2)
+                                .seq(0)
+                                .text(Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8)))
+                                .build())
                         .build())
                 .build();
     }
