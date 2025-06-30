@@ -62,7 +62,7 @@ public class InterviewWsController {
                         messagingTemplate.convertAndSendToUser(
                                 userId.toString(),
                                 "/queue/interview/answer", // 与前端订阅地址匹配
-                                new ChatMessage("AI", reply)
+                                new ChatMessage("assistant", reply)
                         );
                     });
         } catch (NumberFormatException e) {

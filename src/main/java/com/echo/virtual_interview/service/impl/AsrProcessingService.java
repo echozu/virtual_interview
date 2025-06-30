@@ -52,7 +52,11 @@ public class AsrProcessingService {
     private final Map<String, BlockingQueue<byte[]>> audioQueues = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> sendingTasks = new ConcurrentHashMap<>();
     private final ScheduledExecutorService sendingScheduler;
+    // 【新增】定义用户实时转写文本的目标地址
+    private static final String DEST_USER_TRANSCRIPT = "/queue/interview/transcript.user";
 
+    // 【新增】定义AI实时回复文本的目标地址
+    private static final String DEST_AI_TRANSCRIPT = "/queue/interview/transcript.assistant";
     @Autowired
     private TtsService ttsService; // 注入语音合成服务
 
@@ -102,7 +106,6 @@ public class AsrProcessingService {
 
     // 语音-文本，返回流式文本
     private IflytekAsrClient createAndConnectClient(String sessionId, Integer userId) {
-        // ... 此方法保持不变 ...
         log.info("为会话 {} 创建新的讯飞ASR客户端及相关资源", sessionId);
 
         transcriptBuffers.put(sessionId, new StringBuilder());
@@ -136,7 +139,7 @@ public class AsrProcessingService {
                                 messagingTemplate.convertAndSendToUser(
                                         userId.toString(),
                                         "/queue/interview/answer",
-                                        new ChatMessage("AI", aiReply)
+                                        new ChatMessage("assistant", aiReply)
                                 );
                             });
                 } else {
@@ -216,11 +219,22 @@ public class AsrProcessingService {
             Draft draft = new DraftWithOrigin(iflytekProperties.getHost());
 
             // 1. ASR实时转写回调：将识别的文字片段追加到缓冲区
+            // --- 修改这里的 onMessageCallback ---
             Consumer<String> onMessageCallback = (transcribedText) -> {
+                // 1. 原有逻辑：将结果追加到内部缓冲区，用于最后生成完整文本
                 StringBuilder buffer = transcriptBuffers.get(sessionId);
                 if (StringUtils.hasText(transcribedText) && buffer != null) {
                     log.info("[实时转写] 会话: {} 追加文本: '{}'", sessionId, transcribedText);
                     buffer.append(transcribedText);
+                }
+
+                // 2. 【新增逻辑】将这个实时的、不完整的用户转写文本块，发送给前端
+                if (StringUtils.hasText(transcribedText)) {
+                    messagingTemplate.convertAndSendToUser(
+                            userId.toString(),
+                            DEST_USER_TRANSCRIPT,
+                            new ChatMessage("user", transcribedText) // 使用您已有的ChatMessage DTO
+                    );
                 }
             };
 
@@ -240,7 +254,7 @@ public class AsrProcessingService {
                 }
             };
 
-            // 创建并连接ASR客户端... (这部分代码与原版相同)
+            // 创建并连接ASR客户端...
             IflytekAsrClient client = new IflytekAsrClient(new URI(url), draft, onMessageCallback, onCloseCallback);
             client.setConnectionLostTimeout(60);
             client.connectBlocking(5, TimeUnit.SECONDS);
@@ -310,12 +324,23 @@ public class AsrProcessingService {
 
         // 调用AI服务，并订阅其返回的流式文本
         interviewService.interviewProcess(fullText, sessionId, userId)
-                .doOnNext(processor::processText) // 1. 每个文本块都交给句子处理器
+                .doOnNext(aiReplyChunk -> {
+                    // 1. 【新增逻辑】将AI返回的文本块，实时发送给前端
+                    if (StringUtils.hasText(aiReplyChunk)) {
+                        messagingTemplate.convertAndSendToUser(
+                                userId.toString(),
+                                DEST_AI_TRANSCRIPT,
+                                new ChatMessage("assistant", aiReplyChunk) // 使用您已有的ChatMessage DTO
+                        );
+                    }
+
+                    // 2. 原有逻辑：将文本块交给句子处理器，用于后续的TTS
+                    processor.processText(aiReplyChunk);
+                })
                 .doOnComplete(() -> {
-                    log.info("AI文本流接收完毕，处理缓冲区中最后的内容。SessionID: {}", sessionId);
-                    // 【修改点】标记AI流已结束，并让flush处理剩余文本
+                    log.info("AI文本流接收完毕，开始处理缓冲区中最后的内容。SessionID: {}", sessionId);
                     processor.setAiStreamFinished(true);
-                    processor.flush();
+
                 })
                 .doOnError(error -> {
                     log.error("处理AI回复流时发生错误，将向前端发送结束信号。SessionID: {}", sessionId, error);
@@ -340,7 +365,7 @@ public class AsrProcessingService {
     private void sendCompleteSentenceToTTS(String sentence, Integer userId, Runnable onSynthesisComplete) {
         if (!StringUtils.hasText(sentence)) {
             // 如果句子为空，直接执行完成回调
-            if(onSynthesisComplete != null) onSynthesisComplete.run();
+            if (onSynthesisComplete != null) onSynthesisComplete.run();
             return;
         }
         log.info("发送句子到TTS: '{}'", sentence);
@@ -357,12 +382,12 @@ public class AsrProcessingService {
         // 【修改点】onComplete不再关心是否是最后一句，它只负责调用传入的回调
         Runnable onComplete = () -> {
             log.info("句子 '{}' 合成完毕。", sentence);
-            if(onSynthesisComplete != null) onSynthesisComplete.run();
+            if (onSynthesisComplete != null) onSynthesisComplete.run();
         };
 
         Consumer<String> onError = errorMsg -> {
             log.error("句子 '{}' 合成失败: {}", sentence, errorMsg);
-            if(onSynthesisComplete != null) onSynthesisComplete.run(); // 失败也算完成，以防锁死计数器
+            if (onSynthesisComplete != null) onSynthesisComplete.run(); // 失败也算完成，以防锁死计数器
         };
 
         try {
@@ -372,6 +397,7 @@ public class AsrProcessingService {
             onError.accept(e.getMessage());
         }
     }
+
     /**
      * 【全新】向指定用户发送音频流结束的信号。
      */
@@ -480,6 +506,7 @@ public class AsrProcessingService {
             return -1;
         }
     }
+
     // ... cleanupSessionResources 和 shutdown 方法保持不变 ...
     private void cleanupSessionResources(String sessionId) {
         log.info("正在清理会话 {} 的所有ASR资源...", sessionId);

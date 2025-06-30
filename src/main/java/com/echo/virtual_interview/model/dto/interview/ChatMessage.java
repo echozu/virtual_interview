@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatMessage {
-    private String sender;   // 发送者：用户/AI
+    private String sender;   // 发送者：'user' (用户) 或 'assistant
     private String content;  // 消息内容
 }
