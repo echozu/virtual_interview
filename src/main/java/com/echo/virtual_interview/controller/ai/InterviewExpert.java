@@ -9,9 +9,11 @@ import com.echo.virtual_interview.model.entity.ResumeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -44,8 +46,9 @@ public class InterviewExpert {
      *
      * @param xunFeiChatModel
      */
-    public InterviewExpert(ChatModel xunFeiChatModel, MysqlInterviewMemory mysqlInterviewMemory) {
+    public InterviewExpert(ChatModel xunFeiChatModel, MysqlInterviewMemory mysqlInterviewMemory, Advisor ragCloudAdvisor) {
         this.mysqlInterviewMemory = mysqlInterviewMemory;
+        this.ragCloudAdvisor = ragCloudAdvisor;
         this.chatClient = ChatClient.builder(xunFeiChatModel)
 //                .defaultSystem(SYSTEM_PROMPT)  // 这里先不需要基础的聊天提示词，后面的client自己加即可
                 .defaultAdvisors(
@@ -59,6 +62,8 @@ public class InterviewExpert {
 
                 .build();
     }
+    @Qualifier("RagCloudAdvisor")
+    private final Advisor ragCloudAdvisor; // 添加讯飞的知识库
     /**
      * 面试过程的对话
      *
@@ -119,7 +124,9 @@ public class InterviewExpert {
                 .user(message)
                 .advisors(spec -> spec
                         .param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
-                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
+                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10)
+                        .advisors(ragCloudAdvisor)  // 这里是开启讯飞知识库
+                )
                 .stream()
                 .content();
     }

@@ -42,58 +42,6 @@ public class InterviewWsController {
         this.interviewExpert = interviewExpert;
     }
 
-
-
-    /**
-     * 面试过程-websocket-文字版
-     * 注意：为了与音频接口保持一致，路径最好也统一
-     */
-    @MessageMapping("/interview/process/{sessionId}")
-    public void handleUserMessage(
-            @DestinationVariable String sessionId,
-            @Payload ChatMessage message,
-            @Header("user-id") String userIdStr) {
-        try {
-            Integer userId = Integer.parseInt(userIdStr);
-            UserIdContext.setUserIdContext(userId);
-
-            interviewService.interviewProcess(message.getContent(), sessionId, userId)
-                    .subscribe(reply -> {
-                        messagingTemplate.convertAndSendToUser(
-                                userId.toString(),
-                                "/queue/interview/answer", // 与前端订阅地址匹配
-                                new ChatMessage("assistant", reply)
-                        );
-                    });
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("非法的用户ID格式");
-        }
-    }
-
-    /**
-     * 处理前端发送的音频流数据，并返回流式文本
-     * 现在接收一个包含Base64音频字符串的DTO
-     */
-    @MessageMapping("/interview/process/audio/{sessionId}")
-    public void handleAudioChunk(
-            @DestinationVariable String sessionId,
-            @Payload AudioChunkDto chunkDto, // <-- 修改点：使用DTO接收
-            @Header("user-id") String userIdStr) {
-        try {
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // --- 新增：从Base64解码回原始的byte[] ---
-            byte[] audioData = Base64.getDecoder().decode(chunkDto.getAudio());
-
-            log.trace("收到来自用户 {} 会话 {} 的音频数据，解码后大小: {} bytes", userId, sessionId, audioData.length);
-            asrProcessingService.processAudioChunk(sessionId, userId, audioData);
-        } catch (NumberFormatException e) {
-            log.error("无效的用户ID格式: {}", userIdStr);
-        } catch (IllegalArgumentException e) {
-            // 如果Base64字符串格式不正确，会抛出此异常
-            log.error("Base64解码音频数据失败: {}", e.getMessage());
-        }
-    }
     /**语音--文本（ai）---语音
      * 处理前端发送的音频流数据，并返回流式音频
      * 现在接收一个包含Base64音频字符串的DTO
@@ -101,7 +49,7 @@ public class InterviewWsController {
     @MessageMapping("/interview/process/audio/tts/{sessionId}")
     public void handleAudioChunkTTS(
             @DestinationVariable String sessionId,
-            @Payload AudioChunkDto chunkDto, // <-- 修改点：使用DTO接收
+            @Payload AudioChunkDto chunkDto, //
             @Header("user-id") String userIdStr) {
         try {
             Integer userId = Integer.parseInt(userIdStr);
@@ -129,6 +77,58 @@ public class InterviewWsController {
         log.info("收到用户 {} 会话 {} 的音频结束信号", userIdStr, sessionId);
         asrProcessingService.endAudioStream(sessionId);
     }
+
+    /**
+     * 面试过程-websocket-文字版 -测试
+     * 注意：为了与音频接口保持一致，路径最好也统一
+     */
+    @MessageMapping("/interview/process/{sessionId}")
+    public void handleUserMessage(
+            @DestinationVariable String sessionId,
+            @Payload ChatMessage message,
+            @Header("user-id") String userIdStr) {
+        try {
+            Integer userId = Integer.parseInt(userIdStr);
+            UserIdContext.setUserIdContext(userId);
+
+            interviewService.interviewProcess(message.getContent(), sessionId, userId)
+                    .subscribe(reply -> {
+                        messagingTemplate.convertAndSendToUser(
+                                userId.toString(),
+                                "/queue/interview/answer", // 与前端订阅地址匹配
+                                new ChatMessage("assistant", reply)
+                        );
+                    });
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("非法的用户ID格式");
+        }
+    }
+
+    /**
+     * 处理前端发送的音频流数据，并返回流式文本 -测试
+     * 现在接收一个包含Base64音频字符串的DTO
+     */
+    @MessageMapping("/interview/process/audio/{sessionId}")
+    public void handleAudioChunk(
+            @DestinationVariable String sessionId,
+            @Payload AudioChunkDto chunkDto, // <-- 修改点：使用DTO接收
+            @Header("user-id") String userIdStr) {
+        try {
+            Integer userId = Integer.parseInt(userIdStr);
+
+            // --- 新增：从Base64解码回原始的byte[] ---
+            byte[] audioData = Base64.getDecoder().decode(chunkDto.getAudio());
+
+            log.trace("收到来自用户 {} 会话 {} 的音频数据，解码后大小: {} bytes", userId, sessionId, audioData.length);
+            asrProcessingService.processAudioChunk(sessionId, userId, audioData);
+        } catch (NumberFormatException e) {
+            log.error("无效的用户ID格式: {}", userIdStr);
+        } catch (IllegalArgumentException e) {
+            // 如果Base64字符串格式不正确，会抛出此异常
+            log.error("Base64解码音频数据失败: {}", e.getMessage());
+        }
+    }
+
 }
 
 /*
