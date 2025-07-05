@@ -3,25 +3,18 @@ package com.echo.virtual_interview.common;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 返回工具类【利用了BaseResPonse】
- * 添加了彩色日志输出功能
+ * 返回工具类【利用了BaseResponse】
+ * 使用清晰格式的日志输出，不依赖ANSI颜色
  */
 @Slf4j
 public class ResultUtils {
 
-    // ANSI color codes
-    private static final String ANSI_RESET = "\u001B[0m";
-    private static final String ANSI_GREEN = "\u001B[32m";
-    private static final String ANSI_RED = "\u001B[31m";
-    private static final String ANSI_YELLOW = "\u001B[33m";
-    private static final String ANSI_CYAN = "\u001B[36m";
-
     /**
-     * 成功
-     * 使用：1.返回参数写 BaseResponse<T>
-     * 2.return ResultUtils.success(data)
+     * 成功响应
+     * 使用示例: return ResultUtils.success(data);
+     *
      * @param data 返回数据
-     * @param <T> 数据类型
+     * @param <T>  数据类型
      * @return 成功响应
      */
     public static <T> BaseResponse<T> success(T data) {
@@ -31,8 +24,9 @@ public class ResultUtils {
     }
 
     /**
-     * 失败
-     * 使用：return ResultUtils.error(错误码，如Error.PARAMS_ERROR)
+     * 失败响应（基于错误码）
+     * 使用示例: return ResultUtils.error(Error.PARAMS_ERROR);
+     *
      * @param errorCode 错误码
      * @return 错误响应
      */
@@ -43,8 +37,9 @@ public class ResultUtils {
     }
 
     /**
-     * 失败
-     * 使用：return ResultUtils.error(code,错误信息)
+     * 失败响应（自定义状态码+消息）
+     * 使用示例: return ResultUtils.error(400, "参数错误");
+     *
      * @param code 错误码
      * @param message 错误信息
      * @return 错误响应
@@ -56,9 +51,10 @@ public class ResultUtils {
     }
 
     /**
-     * 失败
-     * 使用：return ResultUtils.error(错误码，如Error.PARAMS_ERROR，错误信息)
-     * @param errorCode 错误码
+     * 失败响应（错误码+自定义信息）
+     * 使用示例: return ResultUtils.error(ErrorCode.PARAMS_ERROR, "参数为空");
+     *
+     * @param errorCode 错误码对象
      * @param message 自定义错误信息
      * @return 错误响应
      */
@@ -69,32 +65,30 @@ public class ResultUtils {
     }
 
     /**
-     * 日志记录响应信息（带颜色）
-     * @param type 响应类型
+     * 日志记录响应信息（使用分隔线代替颜色）
+     * @param type 响应类型（SUCCESS / ERROR）
      * @param response 响应对象
      */
     private static void logResponse(String type, BaseResponse<?> response) {
-        String color = ANSI_GREEN;
-        String level = "INFO";
+        String border = "==================================================";
+        String header = String.format("%s\n[%s] 返回给前端的响应\n%s", border, type, border);
+
+        String body = String.format(
+                "\nCode: %d\n" +
+                        "Message: %s\n" +
+                        "Data: %s\n" +
+                        "%s",
+                response.getCode(),
+                response.getMessage(),
+                response.getData(),
+                border);
+
+        String fullLog = header + body;
 
         if ("ERROR".equals(type)) {
-            color = ANSI_RED;
-            level = "ERROR";
-        }
-
-        String logMessage = String.format("\n%s[%s] 返回给前端的响应%s\n" +
-                        "%sCode: %s%d%s\n" +
-                        "%sMessage: %s%s%s\n" +
-                        "%sData: %s%s%s",
-                color, type, ANSI_RESET,
-                ANSI_CYAN, color, response.getCode(), ANSI_RESET,
-                ANSI_CYAN, color, response.getMessage(), ANSI_RESET,
-                ANSI_CYAN, color, response.getData(), ANSI_RESET);
-
-        if ("ERROR".equals(type)) {
-            log.error(logMessage);
+            log.error(fullLog);
         } else {
-            log.info(logMessage);
+            log.info(fullLog);
         }
     }
 }

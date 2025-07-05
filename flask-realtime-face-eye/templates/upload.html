@@ -42,7 +42,7 @@
     <!-- 上传表单 -->
     <form id="upload-form" enctype="multipart/form-data" class="space-y-6">
 
-        <!-- ✅ 新增: Session ID 输入框 -->
+        <!-- Session ID 输入框 -->
         <div>
             <label for="session-id" class="block mb-2 text-sm font-medium text-gray-300">面试会话ID (Session ID)</label>
             <input type="text" id="session-id" name="sessionId" value="test-session-12345" required
@@ -116,7 +116,6 @@
         updateStatus('✔️ 任务已创建! 正在等待分析结果...');
 
         // ❗ 注意: 在实际项目中，这个token应该在用户登录后从localStorage或cookie中动态获取。
-        // 这里为了演示，我们先使用您提供的静态token。
         const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJlY2hvIiwiaWF0IjoxNzUxNzAzMDc2LCJleHAiOjE3NTE3ODk0NzZ9.EfsJXTzrPwMcDmTi3mTvBCaMUb6ll_ICYN-BkksdoOs';
 
         pollingIntervalId = setInterval(async () => {
@@ -129,7 +128,7 @@
             }
 
             try {
-                // ✅ 修改: 在fetch请求中加入headers
+                // ✅ 已修复: 修正了URL路径，添加了 /process/
                 const response = await fetch(`${javaBackendUrl}/api/interview/process/analysis/result/${analysisId}`, {
                     method: 'GET', // 明确指定方法
                     headers: {
@@ -141,32 +140,45 @@
                 if (!response.ok) {
                     // 如果是401或403，说明token无效或权限不足
                     if (response.status === 401 || response.status === 403) {
-                         clearInterval(pollingIntervalId);
-                         updateStatus('❌ 验证失败，请重新登录。', false);
-                         submitBtn.disabled = false;
-                         videoInput.disabled = false;
-                         return;
+                        clearInterval(pollingIntervalId);
+                        updateStatus('❌ 验证失败，请重新登录。', false);
+                        submitBtn.disabled = false;
+                        videoInput.disabled = false;
+                        return;
                     }
                     console.warn(`Polling request failed with status: ${response.status}`);
                     return;
                 }
                 const result = await response.json();
 
+                // 增加日志，帮助调试
+                console.log("轮询结果:", result);
+
+                // 增加健壮性检查
+                if (!result || typeof result.data === 'undefined') {
+                    console.error("轮询返回的JSON格式不正确，缺少 'data' 字段。", result);
+                    return;
+                }
+
                 // 根据Java后端返回的状态更新UI
-                // 注意：这里的result.data.status是您Java后端AnalysisResult记录中的status字段
                 switch (result.data.status) {
                     case 'PENDING':
                         updateStatus(`⏳ 分析进行中... (${result.data.data || ''})`);
                         break;
                     case 'COMPLETED':
-                        clearInterval(pollingIntervalId); // 停止轮询
-                        updateStatus(null); // 隐藏加载器
-                        resultsDiv.textContent = "✅ 分析完成!\n" + JSON.stringify(result.data.data, null, 2);
+                        clearInterval(pollingIntervalId);
+                        updateStatus(null);
+                        // 确保 result.data.data 存在且是一个对象
+                        if (result.data.data && typeof result.data.data === 'object') {
+                            resultsDiv.textContent = "✅ 分析完成!\n" + JSON.stringify(result.data.data, null, 2);
+                        } else {
+                            resultsDiv.textContent = "✅ 分析完成，但结果格式异常。\n" + JSON.stringify(result.data, null, 2);
+                        }
                         submitBtn.disabled = false;
                         videoInput.disabled = false;
                         break;
                     case 'FAILED':
-                        clearInterval(pollingIntervalId); // 停止轮询
+                        clearInterval(pollingIntervalId);
                         updateStatus('❌ 分析任务失败。', false);
                         resultsDiv.textContent = "错误详情: " + JSON.stringify(result.data.data, null, 2);
                         submitBtn.disabled = false;
@@ -175,7 +187,14 @@
                 }
 
             } catch (error) {
-                console.error('Polling error:', error);
+                console.error('轮询时发生网络或JSON解析错误:', error);
+                // 如果是JSON解析错误，可能需要停止轮询
+                if (error instanceof SyntaxError) {
+                    clearInterval(pollingIntervalId);
+                    updateStatus('❌ 接收到无法解析的响应，请检查后端服务。', false);
+                    submitBtn.disabled = false;
+                    videoInput.disabled = false;
+                }
             } finally {
                 attempts++;
             }
@@ -193,10 +212,9 @@
 
         if(pollingIntervalId) clearInterval(pollingIntervalId);
 
-        // ✅ FormData会自动收集所有命名的表单字段，包括我们新增的sessionId
         const formData = new FormData(uploadForm);
-        const pythonServiceUrl = 'http://localhost:55274'; // 你的Python服务地址
-        const javaBackendUrl = 'http://localhost:9527'; // ❗❗❗ 请替换为你的Java后端地址
+        const pythonServiceUrl = 'http://123.207.53.16:55274'; // 你的Python服务地址
+        const javaBackendUrl = 'http://123.207.53.16:9527'; // ❗❗❗ 请替换为你的Java后端地址
 
         resultsDiv.textContent = '正在上传视频并创建分析任务...';
         updateStatus('⚙️ 上传中...');
@@ -204,7 +222,6 @@
         videoInput.disabled = true;
 
         try {
-            // 1. 调用Python服务，获取 analysisId
             const response = await fetch(`${pythonServiceUrl}/api/analyze_video`, {
                 method: 'POST',
                 body: formData
@@ -217,10 +234,8 @@
 
             const data = await response.json();
 
-            // 2. 检查Python返回的JSON中是否包含 analysisId
             if (data.analysisId) {
                 resultsDiv.textContent = `任务创建成功，ID: ${data.analysisId}\n即将开始轮询获取结果...`;
-                // 3. 开始轮询
                 startPolling(data.analysisId, javaBackendUrl);
             } else {
                 throw new Error("未能从后端获取有效的分析任务ID。");
