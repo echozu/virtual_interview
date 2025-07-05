@@ -28,7 +28,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/swagger-ui/**",           // Swagger UI
                         "/api-docs/**",             // API文档
                         "/v3/api-docs/**",           // OpenAPI文档
-                        "/ws/**" // 放行 WebSocket 请求路径
+                        "/ws/**", // 放行 WebSocket 请求路径
+                        "/api/interview/process/python/video_analyse" // 放行python传来的分析结果
 
                 );
     }

@@ -4,8 +4,11 @@ import com.echo.virtual_interview.adapater.ResumeAndChannelAdapter;
 import com.echo.virtual_interview.controller.ai.advisor.MyLoggerAdvisor;
 import com.echo.virtual_interview.controller.ai.chatMemory.MysqlInterviewMemory;
 import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
+import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
 import com.echo.virtual_interview.model.dto.resum.ResumeDataDto;
 import com.echo.virtual_interview.model.entity.ResumeModule;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -30,6 +33,8 @@ public class InterviewExpert {
     private final ChatClient chatClient;
     @Autowired
     private final MysqlInterviewMemory mysqlInterviewMemory;
+    @Resource
+    private ObjectMapper objectMapper;
     private static final String SYSTEM_PROMPT = """
             你是一位专精于技术类岗位面试辅导的AI教练，具备丰富的大厂面试经验。
             - 识别内容阶段（如：自我介绍 / 项目经历 / 技术问答 / 行为问题等）；
@@ -61,6 +66,78 @@ public class InterviewExpert {
                 )
 
                 .build();
+    }
+
+    // 根据视频流+图片的分析
+    /**
+     * 专为实时视频+图片分析设计的提示词。
+     * 它的目标是：快速、简洁、聚焦于核心状态。
+     */
+    /**
+     * 专为实时视频+图片分析设计的提示词。
+     * V2版本：包含了详细的数据释义，并要求AI以JSON格式返回结构化数据。
+     */
+
+    /**
+     * 专为实时视频+图片分析设计的提示词。
+     * V3版本：在返回的JSON中增加了 detailed_analysis 字段，用于数据库存储。
+     */
+    /**
+     * 专为实时视频+图片分析设计的提示词。
+     * V3版本：增加了更多维度的输入数据和更详细的数据释义，以提升AI分析的准确性。
+     */
+    private static final String REALTIME_VIDEO_PICTURE_ANALYSIS_PROMPT = """
+            你是一位顶级的AI面试行为分析官，极其擅长从细微的非语言信号中解读候选人的心理状态。
+            你的任务是根据以下提供的候选人实时行为数据，用中文生成一份结构化的即时状态反馈。
+
+            # 核心规则
+            1.  **聚焦核心状态**：你的分析必须严格围绕候选人的 **眼神交流质量** 和 **情绪紧张程度** 展开。
+            2.  **循证分析**：你的每一句结论都必须基于我提供的数据，不允许凭空想象。
+            3.  **专业且简洁**：语言要专业、精炼，符合面试辅导的场景。
+            4.  **JSON输出**：必须严格按照我要求的JSON格式输出，不要包含任何Markdown标记或额外文字。
+
+            # 数据释义 (这是你分析的依据)
+            - `核心紧张度` (String): 对紧张状态的直接定性，如 "高度紧张", "状态放松"。
+            - `平均注意力分数` (Number): 眼神接触质量的核心指标。分数 > 0.9 表示非常专注；0.7-0.9 表示基本专注；< 0.7 表示注意力有明显分散。
+            - `注意力稳定性` (Number): 眼神飘忽程度。该值(标准差) > 0.3 暗示眼神游离，是焦虑的信号。
+            - `总眨眼次数` (Number): 紧张的生理反应。半分钟内 > 20次 是典型的压力信号。
+            - `头部晃动幅度` (Number): 不安的小动作。该值(偏航角标准差) > 4.0 可能与焦虑有关。
+            - `开场表情` / `当前表情` (String): 面部表情的快照，是判断情绪的直接证据。
+
+            # 输入数据
+            {ANALYSIS_DATA}
+
+            # 输出要求 (必须是可直接解析的JSON)
+            请生成一个包含以下字段的JSON对象：
+            - `summary` (String): 一句话总结候选人当前的状态，用于实时显示给用户。
+            - `suggestion` (String): 如果状态不佳，提供一句具体的、可操作的改进建议。如果状态良好，此字段为空字符串。
+            - `status` (String): 状态标识符，只能是 "POSITIVE" (状态良好) 或 "NEEDS_IMPROVEMENT" (有待提高) 中的一个。
+            - `detailed_analysis` (Object): 一个包含详细分析条目的对象，用于后台存储。其中应包含 `eye_contact_analysis` 和 `emotional_state_analysis` 两个键，内容是你对这两方面表现的详细文字说明。
+
+            [你的JSON输出]
+            """;
+
+    /**
+     * 根据格式化的视频流和图片分析数据，调用AI生成实时反馈。
+     *
+     * @param formattedAnalysisData 经过处理和格式化的分析数据字符串。
+     * @return AI生成的简短实时反馈。
+     */
+    /**
+     * 根据格式化的视频流和图片分析数据，调用AI生成结构化的实时反馈。
+     */
+    public RealtimeFeedbackDto aiInterviewByVideoAndPicture(String formattedAnalysisData) {
+        String finalPrompt = REALTIME_VIDEO_PICTURE_ANALYSIS_PROMPT.replace("{ANALYSIS_DATA}", formattedAnalysisData);
+        try {
+        return  this.chatClient.
+                prompt()
+                .user(finalPrompt)
+                .call()
+                .entity(RealtimeFeedbackDto.class);
+        } catch (Exception e) {
+            log.error("解析AI返回的实时反馈JSON失败");
+            return new RealtimeFeedbackDto("AI分析结果解析失败，请稍后重试。", "", "NEEDS_IMPROVEMENT", null);
+        }
     }
     @Qualifier("RagCloudAdvisor")
     private final Advisor ragCloudAdvisor; // 添加讯飞的知识库
@@ -139,10 +216,6 @@ public class InterviewExpert {
                 .map(ResumeModule::getContent)
                 .orElse("相关技术");
     }
-
-
-
-
 
 
 

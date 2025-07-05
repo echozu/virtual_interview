@@ -1,6 +1,7 @@
 package com.echo.virtual_interview.service;
 
-import com.echo.virtual_interview.common.BaseResponse;
+import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
+import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPayload;
 import com.echo.virtual_interview.model.entity.InterviewSessions;
 import com.baomidou.mybatisplus.extension.service.IService;
 import jakarta.validation.constraints.NotBlank;
@@ -17,4 +18,5 @@ public interface IInterviewSessionsService extends IService<InterviewSessions> {
 
     String start(@NotBlank Long channelId);
 
+    RealtimeFeedbackDto processAndStoreAnalysis(VideoAnalysisPayload payload);
 }

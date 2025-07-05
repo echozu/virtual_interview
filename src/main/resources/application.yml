@@ -10,6 +10,8 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+    converters:
+      preferred-json-mapper: jackson
 #  jackson:
 #    property-naming-strategy: SNAKE_CASE # 让Jackson自动将JSON的snake_case映射到Java的camelCase
   main:
@@ -114,13 +116,16 @@ xunfei:
     appid: "bbbfe203"
     secret-key: "***REMOVED***"
     host: "rtasr.xfyun.cn/v1/ws"
-  tts: # Text-To-Speech (语音合成) 配置
+  tts: # Text-To-Speech (语音合成) 配置 【yzx的】
     host: "cbm01.cn-huabei-1.xf-yun.com"
-    app-id: "bbbfe203"
-    api-key: "4f0311e6c8e3f9447384312cfa500194"
-    api-secret: "***REMOVED***"
+    app-id: "e871abfa"
+    api-key: "9b235c37a1b6865cb69502bd2a3df043"
+    api-secret: "NTNiNzlmYzFlYjM0NzJmNDUzMmY4ODFl"
     vcn: "x5_lingfeiyi_flow" # 默认发音人，可以根据需求更改
   knowledge:
     app-id: "bbbfe203"
     secret: "***REMOVED***"
     knowledge-base-name: "interview"
+  face-score:
+    appid: "bbbfe203"
+    apikey: "***REMOVED***"

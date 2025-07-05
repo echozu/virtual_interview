@@ -64,5 +64,10 @@ public class InterviewSessions implements Serializable {
     @SchemaProperty(name = "面试综合得分")
     private BigDecimal overallScore;
 
+    @SchemaProperty(name = "记录创建时间")
+    private LocalDateTime createdAt;
+
+    @SchemaProperty(name = "记录更新时间")
+    private LocalDateTime updatedAt;
 
 }

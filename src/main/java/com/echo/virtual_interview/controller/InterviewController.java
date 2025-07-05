@@ -2,19 +2,13 @@ package com.echo.virtual_interview.controller;
 
 import com.echo.virtual_interview.common.BaseResponse;
 import com.echo.virtual_interview.common.ResultUtils;
-import com.echo.virtual_interview.context.UserIdContext;
-import com.echo.virtual_interview.controller.ai.InterviewExpert;
-import com.echo.virtual_interview.service.IInterviewService;
+import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
+import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPayload;
 import com.echo.virtual_interview.service.IInterviewSessionsService;
-import com.echo.virtual_interview.service.impl.AsrProcessingService;
+import com.echo.virtual_interview.service.impl.AnalysisStatusService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Flux;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 面试接口
@@ -23,24 +17,10 @@ import reactor.core.publisher.Flux;
 @RequestMapping("/api/interview")
 @Slf4j
 public class InterviewController {
-
-    private final IInterviewService interviewService;
-    private final IInterviewSessionsService interviewSessionsService;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final AsrProcessingService asrProcessingService;
-    private final InterviewExpert interviewExpert;
-
-    // --- 最佳实践：使用一个构造函数完成所有依赖注入 ---
-    public InterviewController(IInterviewService interviewService,
-                               IInterviewSessionsService interviewSessionsService,
-                               SimpMessagingTemplate messagingTemplate,
-                               AsrProcessingService asrProcessingService, InterviewExpert interviewExpert) {
-        this.interviewService = interviewService;
-        this.interviewSessionsService = interviewSessionsService;
-        this.messagingTemplate = messagingTemplate;
-        this.asrProcessingService = asrProcessingService;
-        this.interviewExpert = interviewExpert;
-    }
+    @Resource
+    private IInterviewSessionsService interviewSessionsService;
+    @Resource
+    private AnalysisStatusService analysisStatusService;
 
 
     /**
@@ -56,8 +36,49 @@ public class InterviewController {
         return ResultUtils.success(sessionId);
     }
 
+    /**
+     * 接收视频分析结果，包含行为数据、关键帧图像和 sessionId。
+     * 此接口由Python分析服务调用。
+     *
+     * @param payload 包含所有分析结果的完整JSON负载，自动映射为Java对象。
+     * @return 一个统一的响应对象，告知Python服务是否接收成功。
+     */
+
+    @PostMapping("/process/python/video_analyse")
+    public BaseResponse<String> receiveVideoAnalysis(@RequestBody VideoAnalysisPayload payload) {
+        System.out.println("成功接收到 analysisId 的分析结果: " + payload.getAnalysisId());
+
+        new Thread(() -> {
+            try {
+                RealtimeFeedbackDto finalResult = interviewSessionsService.processAndStoreAnalysis(payload);
+                analysisStatusService.updateTaskResult(payload.getAnalysisId(), "COMPLETED", finalResult);
+            } catch (Exception e) {
+                analysisStatusService.updateTaskResult(payload.getAnalysisId(), "FAILED", e.getMessage());
+                System.err.println("处理 analysisId " + payload.getAnalysisId() + " 时发生异步错误: " + e.getMessage());
+            }
+        }).start();
+
+        return ResultUtils.success("数据已成功接收，正在后台处理。");
+    }
 
 
+    /**
+     * 轮询接口
+     * 前端通过此接口，使用 analysisId 轮询分析结果。
+     */
+
+    /**
+     * 轮询接口，前端通过此接口使用 analysisId 轮询分析结果。
+     */
+    @GetMapping("/process/analysis/result/{analysisId}")
+    public BaseResponse<AnalysisStatusService.AnalysisResult> getAnalysisResult(@PathVariable String analysisId) {
+        AnalysisStatusService.AnalysisResult result = analysisStatusService.getTaskResult(analysisId);
+        if (result == null) {
+            return ResultUtils.success(new AnalysisStatusService.AnalysisResult("PENDING", "分析任务正在队列中，请稍候..."));
+        }
+        return ResultUtils.success(result);
+    }
+}
 
 /*    *//**
      * 面试过程-sse-测试
@@ -73,5 +94,3 @@ public class InterviewController {
         return interviewService.interviewProcess(message, sessionId, userId);
     }*/
 
-
-}
