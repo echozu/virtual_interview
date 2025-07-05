@@ -1,0 +1,471 @@
+# -*- coding: utf-8 -*-
+import base64
+import random
+import string
+import threading
+
+# 导入必要的库
+from flask import Flask, request, jsonify
+import cv2
+import numpy as np
+import dlib
+from math import hypot
+import os
+import time
+import uuid  # 用于生成唯一文件名
+from flask_cors import CORS  # 导入CORS
+
+# 导入我们新的分析模块
+from analysis_module import analyze_interview_data
+import requests
+# --- 初始化 ---
+
+# 初始化 Flask 应用
+app = Flask(__name__)
+# 启用CORS，允许你的前端项目进行跨域调用
+CORS(app)
+app.config['MAIN_BACKEND_URL'] = 'http://123.207.53.16:9527/api/interview/process/python/video_analyse'
+# 定义上传文件存放的目录
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# 加载dlib的面部检测器和关键点预测器
+try:
+    detector = dlib.get_frontal_face_detector()
+    predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+except RuntimeError:
+    print("错误：请确保 'shape_predictor_68_face_landmarks.dat' 文件存在于项目根目录。")
+    exit()
+
+# 眨眼率阈值
+BLINK_RATIO_THRESHOLD = 4.5
+
+
+# --- 辅助函数 ---
+
+def midpoint(p1, p2):
+    return int((p1.x + p2.x) / 2), int((p1.y + p2.y) / 2)
+
+
+def get_blinking_ratio(eye_points, facial_landmark):
+    left_point = (facial_landmark.part(eye_points[0]).x, facial_landmark.part(eye_points[0]).y)
+    right_point = (facial_landmark.part(eye_points[3]).x, facial_landmark.part(eye_points[3]).y)
+    center_top = midpoint(facial_landmark.part(eye_points[1]), facial_landmark.part(eye_points[2]))
+    center_bottom = midpoint(facial_landmark.part(eye_points[5]), facial_landmark.part(eye_points[4]))
+    hor_line_length = hypot((left_point[0] - right_point[0]), (left_point[1] - right_point[1]))
+    vert_line_length = hypot((center_top[0] - center_bottom[0]), (center_top[1] - center_bottom[1]))
+    return hor_line_length / vert_line_length if vert_line_length != 0 else 100.0
+
+
+def get_gaze_ratio(frame, eye_points, facial_landmark, gray):
+    left_eye_region = np.array([(facial_landmark.part(p).x, facial_landmark.part(p).y) for p in eye_points], np.int32)
+    height, width, _ = frame.shape
+    mask = np.zeros((height, width), np.uint8)
+    cv2.polylines(mask, [left_eye_region], True, 255, 2)
+    cv2.fillPoly(mask, [left_eye_region], 255)
+    eye = cv2.bitwise_and(gray, gray, mask=mask)
+    min_x, max_x = np.min(left_eye_region[:, 0]), np.max(left_eye_region[:, 0])
+    min_y, max_y = np.min(left_eye_region[:, 1]), np.max(left_eye_region[:, 1])
+    gray_eye = eye[min_y:max_y, min_x:max_x]
+    if gray_eye.size == 0: return None
+    _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY)
+    threshold_eye = cv2.bitwise_not(threshold_eye)
+    height, width = threshold_eye.shape
+    if width == 0: return None
+    left_side_threshold = threshold_eye[0:height, 0:int(width / 2)]
+    left_side_white = cv2.countNonZero(left_side_threshold)
+    right_side_threshold = threshold_eye[0:height, int(width / 2):width]
+    right_side_white = cv2.countNonZero(right_side_threshold)
+    return left_side_white / right_side_white if right_side_white != 0 else (1 if left_side_white > 0 else None)
+
+
+def get_head_pose(shape, frame_shape):
+    model_points = np.array([(0.0, 0.0, 0.0), (0.0, -330.0, -65.0), (-225.0, 170.0, -135.0), (225.0, 170.0, -135.0),
+                             (-150.0, -150.0, -125.0), (150.0, -150.0, -125.0)])
+    image_points = np.array(
+        [(shape.part(30).x, shape.part(30).y), (shape.part(8).x, shape.part(8).y), (shape.part(36).x, shape.part(36).y),
+         (shape.part(45).x, shape.part(45).y), (shape.part(48).x, shape.part(48).y),
+         (shape.part(54).x, shape.part(54).y)], dtype="double")
+    focal_length, center = frame_shape[1], (frame_shape[1] / 2, frame_shape[0] / 2)
+    camera_matrix = np.array([[focal_length, 0, center[0]], [0, focal_length, center[1]], [0, 0, 1]], dtype="double")
+    (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix,
+                                                                  np.zeros((4, 1)), flags=cv2.SOLVEPNP_ITERATIVE)
+    rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
+    sy = np.sqrt(rotation_matrix[0, 0] * rotation_matrix[0, 0] + rotation_matrix[1, 0] * rotation_matrix[1, 0])
+    singular = sy < 1e-6
+    x = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
+    y = np.arctan2(-rotation_matrix[2, 0], sy)
+    z = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0]) if not singular else 0
+    return np.degrees(x), np.degrees(y), np.degrees(z)
+
+
+def get_facial_expression_proxies(landmarks):
+    lip_top, lip_bottom = (landmarks.part(51).x, landmarks.part(51).y), (landmarks.part(57).x, landmarks.part(57).y)
+    mouth_opening = hypot(lip_top[0] - lip_bottom[0], lip_top[1] - lip_bottom[1])
+    mouth_left, mouth_right = (landmarks.part(48).x, landmarks.part(48).y), (landmarks.part(54).x, landmarks.part(54).y)
+    mouth_width = hypot(mouth_left[0] - mouth_right[0], mouth_left[1] - mouth_right[1])
+    face_width = hypot(landmarks.part(0).x - landmarks.part(16).x, landmarks.part(0).y - landmarks.part(16).y)
+    if face_width == 0: return {'mouth_opening_ratio': 0, 'mouth_smile_ratio': 0}
+    return {'mouth_opening_ratio': mouth_opening / face_width, 'mouth_smile_ratio': mouth_width / face_width}
+
+
+# --- 主视频处理与数据聚合函数 ---
+
+# --- 主视频处理与数据聚合函数 (已修改) ---
+def process_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened(): return None
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+
+    analysis_results_by_second = []
+    frame_data_in_second = []
+    current_second = 0
+    total_frame_count = 0
+    is_blinking = False
+
+    # ✅ --- 新增变量: 用于存储首尾帧 ---
+    first_frame_base64 = None
+    last_frame_np = None
+
+    while True:
+        ret, frame = cap.read()
+        if not ret: break
+
+        # ✅ --- 新增逻辑: 捕获并编码第一帧 ---
+        if first_frame_base64 is None:
+            # 将帧编码为JPEG格式的二进制数据
+            success, buffer = cv2.imencode('.jpg', frame)
+            if success:
+                # 将二进制数据进行Base64编码，并转为UTF-8字符串
+                first_frame_base64 = base64.b64encode(buffer).decode('utf-8')
+
+        # ✅ --- 新增逻辑: 持续更新最后一帧 ---
+        last_frame_np = frame.copy() # 使用copy确保我们得到独立的帧
+
+        total_frame_count += 1
+        second_marker = int((total_frame_count - 1) / fps)
+
+        if second_marker > current_second:
+            if frame_data_in_second:
+                attention_scores = [d['attention_score'] for d in frame_data_in_second]
+                valid_frames = [d for d in frame_data_in_second if d['face_detected']]
+                pitches = [d['head_pose']['pitch'] for d in valid_frames]
+                yaws = [d['head_pose']['yaw'] for d in valid_frames]
+                rolls = [d['head_pose']['roll'] for d in valid_frames]
+                mouth_openings = [d['expression']['mouth_opening_ratio'] for d in valid_frames]
+                mouth_smiles = [d['expression']['mouth_smile_ratio'] for d in valid_frames]
+
+                analysis_results_by_second.append({
+                    "time_in_seconds": current_second + 1,
+                    "face_detection_rate": len(valid_frames) / len(frame_data_in_second),
+                    "attention_mean": np.mean(attention_scores) if attention_scores else 0,
+                    "attention_std": np.std(attention_scores) if attention_scores else 0,
+                    "blink_count": sum(d['is_blinking'] for d in frame_data_in_second),
+                    "head_pose_mean": {"pitch": np.mean(pitches) if pitches else 0, "yaw": np.mean(yaws) if yaws else 0,
+                                       "roll": np.mean(rolls) if rolls else 0},
+                    "head_pose_std": {"pitch": np.std(pitches) if pitches else 0, "yaw": np.std(yaws) if yaws else 0,
+                                      "roll": np.std(rolls) if rolls else 0},
+                    "expression_mean": {"mouth_opening_ratio": np.mean(mouth_openings) if mouth_openings else 0,
+                                        "mouth_smile_ratio": np.mean(mouth_smiles) if mouth_smiles else 0}
+                })
+            frame_data_in_second = []
+            current_second = second_marker
+
+        frame_height, frame_width, _ = frame.shape
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = detector(gray)
+
+        frame_analysis = {"face_detected": False, "attention_score": 0.0, "is_blinking": False, "head_pose": {},
+                          "expression": {}}
+        if len(faces) > 0:
+            landmarks = predictor(gray, faces[0])
+            frame_analysis.update({
+                "face_detected": True,
+                "attention_score": 0.3,
+                "head_pose": dict(zip(['pitch', 'yaw', 'roll'], get_head_pose(landmarks, frame.shape))),
+                "expression": get_facial_expression_proxies(landmarks)
+            })
+            if (blinking_ratio := (get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks) + get_blinking_ratio(
+                    [42, 43, 44, 45, 46, 47], landmarks)) / 2) > BLINK_RATIO_THRESHOLD:
+                if not is_blinking: frame_analysis["is_blinking"] = True
+                is_blinking = True
+            else:
+                is_blinking = False
+
+            gaze_ratio = get_gaze_ratio(frame, [36, 37, 38, 39, 40, 41], landmarks, gray)
+            if gaze_ratio is not None and 0.8 < gaze_ratio < 2.2:
+                frame_analysis["attention_score"] = 1.0
+            else:
+                frame_analysis["attention_score"] = 0.0
+
+        frame_data_in_second.append(frame_analysis)
+
+    last_frame_base64 = None
+    if last_frame_np is not None:
+        success, buffer = cv2.imencode('.jpg', last_frame_np)
+        if success:
+            last_frame_base64 = base64.b64encode(buffer).decode('utf-8')
+
+    cap.release()
+
+    # ✅ --- 修改返回结构: 同时返回分析数据和帧图像数据 ---
+    return {
+        "video_duration_seconds": round(total_frame_count / fps, 2),
+        "analysis_by_second": analysis_results_by_second,
+        "first_frame_base64": first_frame_base64,
+        "last_frame_base64": last_frame_base64
+    }
+
+
+# 新增：按指定时间间隔聚合数据的函数
+def aggregate_data_by_interval(analysis_by_second, interval_seconds=30):
+    if not analysis_by_second: return []
+    aggregated_results = []
+    num_seconds = len(analysis_by_second)
+    for i in range(0, num_seconds, interval_seconds):
+        chunk = analysis_by_second[i:i + interval_seconds]
+        if not chunk: continue
+
+        start_time, end_time = chunk[0]['time_in_seconds'], chunk[-1]['time_in_seconds']
+        attention_means = [s['attention_mean'] for s in chunk]
+        pitch_means, yaw_means, roll_means = ([s['head_pose_mean']['pitch'] for s in chunk],
+                                              [s['head_pose_mean']['yaw'] for s in chunk],
+                                              [s['head_pose_mean']['roll'] for s in chunk])
+
+        aggregated_results.append({
+            "start_time_seconds": start_time,
+            "end_time_seconds": end_time,
+            "interval_duration_seconds": len(chunk),
+            "face_detection_rate": round(np.mean([s['face_detection_rate'] for s in chunk]), 3),
+            "attention_mean": round(np.mean(attention_means), 3),
+            "attention_stability": round(np.std(attention_means), 3),
+            "total_blinks": sum(s['blink_count'] for s in chunk),
+            "head_pose": {
+                "pitch_mean": round(np.mean(pitch_means), 2), "yaw_mean": round(np.mean(yaw_means), 2),
+                "roll_mean": round(np.mean(roll_means), 2),
+                "pitch_fluctuation": round(np.std(pitch_means), 2), "yaw_fluctuation": round(np.std(yaw_means), 2),
+                "roll_fluctuation": round(np.std(roll_means), 2)
+            },
+            "expression": {
+                "mouth_opening_mean": round(np.mean([s['expression_mean']['mouth_opening_ratio'] for s in chunk]), 4),
+                "mouth_smile_mean": round(np.mean([s['expression_mean']['mouth_smile_ratio'] for s in chunk]), 4)
+            }
+        })
+    return aggregated_results
+
+
+# 在 app.py 中，用这个新函数替换掉旧的 calculate_nervousness_score 函数
+
+def calculate_nervousness_score(half_minute_data):
+    """
+    根据半分钟的数据块，生成一份详细的、结构化的紧张度分析报告。
+    这份报告为二次AI分析提供了量化的特征、阈值和判断依据。
+    :param half_minute_data: analysis_by_half_minute 列表中的一个元素
+    :return: 一个包含详细分析的字典
+    """
+
+    # --- 1. 定义分析的阈值和配置 (方便未来调整) ---
+    THRESHOLDS = {
+        'blinks': {'normal_range': [8, 15], 'high_threshold': 20, 'unit': '次/半分钟'},
+        'attention_stability': {'high_threshold': 0.3, 'unit': '标准差'},
+        'head_yaw_fluctuation': {'high_threshold': 4.0, 'unit': '度/标准差'},
+        'face_detection_rate': {'low_threshold': 0.9, 'unit': '比例'}
+    }
+
+    # --- 2. 初始化返回结构 ---
+    total_score = 0
+    components = {}
+
+    # --- 3. 逐项分析并填充components字典 ---
+
+    # 分析1: 眨眼频率
+    blinks_val = half_minute_data['total_blinks']
+    blinks_config = THRESHOLDS['blinks']
+    blinks_score = 0
+    blinks_comment = "眨眼频率在正常范围内。"
+    if blinks_val > blinks_config['high_threshold']:
+        blinks_score = 3
+        blinks_comment = "眨眼频率显著高于正常范围，是压力的强指标。"
+    elif blinks_val > blinks_config['normal_range'][1]:
+        blinks_score = 1
+        blinks_comment = "眨眼频率偏高，可能存在轻微紧张。"
+    components['blinks'] = {
+        "value": blinks_val, "unit": blinks_config['unit'],
+        "normal_range": blinks_config['normal_range'],
+        "score_contribution": blinks_score, "comment": blinks_comment
+    }
+    total_score += blinks_score
+
+    # 分析2: 注意力稳定性
+    attention_val = round(half_minute_data['attention_stability'], 3)
+    attention_config = THRESHOLDS['attention_stability']
+    attention_score = 0
+    attention_comment = "注意力稳定，视线接触良好。"
+    if attention_val > attention_config['high_threshold']:
+        attention_score = 2
+        attention_comment = "注意力稳定性低于阈值，表明视线可能存在回避或飘忽。"
+    components['attention_stability'] = {
+        "value": attention_val, "unit": attention_config['unit'],
+        "threshold_high": attention_config['high_threshold'],
+        "score_contribution": attention_score, "comment": attention_comment
+    }
+    total_score += attention_score
+
+    # 分析3: 头部晃动 (以偏航角为例)
+    yaw_fluctuation_val = round(half_minute_data['head_pose']['yaw_fluctuation'], 2)
+    yaw_config = THRESHOLDS['head_yaw_fluctuation']
+    yaw_score = 0
+    yaw_comment = "头部姿态稳定，未见明显不安的小动作。"
+    if yaw_fluctuation_val > yaw_config['high_threshold']:
+        yaw_score = 2
+        yaw_comment = "头部左右晃动幅度偏高，可能是不安或小动作增多的体现。"
+    components['head_yaw_fluctuation'] = {
+        "value": yaw_fluctuation_val, "unit": yaw_config['unit'],
+        "threshold_high": yaw_config['high_threshold'],
+        "score_contribution": yaw_score, "comment": yaw_comment
+    }
+    total_score += yaw_score
+
+    # 分析4: 面部遮挡
+    face_rate_val = round(half_minute_data['face_detection_rate'], 2)
+    face_rate_config = THRESHOLDS['face_detection_rate']
+    face_rate_score = 0
+    face_rate_comment = "面部检出率正常，未发现明显的用手遮挡行为。"
+    if face_rate_val < face_rate_config['low_threshold']:
+        face_rate_score = 3
+        face_rate_comment = "面部检出率较低，可能存在频繁用手遮挡脸部的行为，这是紧张的典型信号。"
+    components['face_detection_rate'] = {
+        "value": face_rate_val, "unit": face_rate_config['unit'],
+        "threshold_low": face_rate_config['low_threshold'],
+        "score_contribution": face_rate_score, "comment": face_rate_comment
+    }
+    total_score += face_rate_score
+
+    # --- 4. 综合评估最终等级 ---
+    if total_score >= 5:
+        level = "高度紧张"
+    elif total_score >= 3:
+        level = "中度紧张"
+    elif total_score >= 1:
+        level = "轻微紧张"
+    else:
+        level = "状态放松"
+
+    # --- 5. 返回最终的结构化结果 ---
+    return {
+        "overall_score": total_score,
+        "level": level,
+        "components": components
+    }
+
+
+# 这是您原有的分析逻辑，我们将其封装成一个函数，以便在后台线程中调用
+def run_analysis_and_forward(video_path, session_id, analysis_id, main_backend_url):
+    """
+    这个函数在后台线程中执行所有耗时操作。
+    """
+    try:
+        print(f"后台任务 [{analysis_id}] 开始分析视频: {video_path}")
+        start_time = time.time()
+
+        # 1. 视频分析 (这部分代码与您原来的一样)
+        raw_results = process_video(video_path)
+        if raw_results is None or not raw_results.get("analysis_by_second"):
+            print(f"错误 [{analysis_id}]: 视频处理失败或未检测到有效活动")
+            # [可选] 您可以在这里调用Java后端接口，通知任务失败
+            return
+
+        analysis_data = raw_results["analysis_by_second"]
+        half_minute_report = aggregate_data_by_interval(analysis_data, 30)
+
+        for report_block in half_minute_report:
+            nervousness_analysis = calculate_nervousness_score(report_block)
+            report_block['nervousness_analysis'] = nervousness_analysis
+
+        interview_summary = analyze_interview_data(analysis_data)
+
+        end_time = time.time()
+        print(f"后台任务 [{analysis_id}] 分析完成，耗时: {end_time - start_time:.2f} 秒")
+
+        # 2. 准备发送给主后端的数据包
+        final_response_to_main_backend = {
+            "analysisId": analysis_id,  # ✅ 关键：将 analysisId 也发给Java后端
+            "sessionId": session_id,
+            "status": "success",
+            "message": "视频分析成功",
+            "analysis_by_half_minute": half_minute_report,
+            "overall_summary": interview_summary,
+            "raw_data_by_second": analysis_data,
+            "first_frame_base64": raw_results.get("first_frame_base64"),
+            "last_frame_base64": raw_results.get("last_frame_base64")
+        }
+        print(f"分析结果是 [{final_response_to_main_backend}]")
+        # 3. 将分析结果发送到您的主后端
+        print(f"后台任务 [{analysis_id}] 正在将结果转发至: {main_backend_url}")
+        try:
+            forward_response = requests.post(
+                main_backend_url,
+                json=final_response_to_main_backend,
+                timeout=20  # 转发可以设置稍长的超时
+            )
+            forward_response.raise_for_status()
+            print(f"后台任务 [{analysis_id}] 成功将数据转发至主后端。")
+        except requests.exceptions.RequestException as e:
+            print(f"错误 [{analysis_id}]: 转发至主后端失败: {e}")
+            # [可选] 您可以在这里调用Java后端接口，通知任务失败
+
+    except Exception as e:
+        print(f"后台任务 [{analysis_id}] 处理过程中发生严重错误: {e}")
+    finally:
+        # 4. 清理临时文件
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            print(f"后台任务 [{analysis_id}]: 已删除临时视频文件 {video_path}")
+
+
+@app.route('/api/analyze_video', methods=['POST'])
+def analyze_video_api():
+    if 'video' not in request.files: return jsonify({"error": "请求中未找到视频文件"}), 400
+    if 'sessionId' not in request.form: return jsonify({"error": "请求中缺少 sessionId"}), 400
+
+    file = request.files['video']
+    session_id = request.form.get('sessionId')
+    if file.filename == '': return jsonify({"error": "未选择文件"}), 400
+
+    # ✅ 1. 生成唯一的、符合您格式要求的 analysisId
+    timestamp = int(time.time())
+    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    analysis_id = f"{session_id}-{timestamp}-{random_str}"
+
+    filename = f"{analysis_id}-{os.path.basename(file.filename)}"
+    video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    # 保存文件
+    file.save(video_path)
+
+    # ✅ 2. 启动后台线程执行耗时任务
+    main_backend_url = app.config['MAIN_BACKEND_URL']
+    thread = threading.Thread(
+        target=run_analysis_and_forward,
+        args=(video_path, session_id, analysis_id, main_backend_url)
+    )
+    thread.start()
+
+    print(f"已为会话 {session_id} 创建分析任务，ID为: {analysis_id}")
+
+    # ✅ 3. 立即向前端返回 analysisId
+    return jsonify({
+        "status": "processing",
+        "message": "分析任务已成功创建，正在后台处理中。",
+        "analysisId": analysis_id
+    })
+
+# --- 主程序入口 ---
+if __name__ == '__main__':
+    ip_address = "0.0.0.0"
+    port = 55274
+    print(f"✅ API服务启动成功，正在监听 http://{ip_address}:{port}")
+    print(f"🚀 请通过 POST 请求访问 /api/analyze_video 接口以上传视频进行分析")
+    app.run(host=ip_address, port=port, debug=True)
