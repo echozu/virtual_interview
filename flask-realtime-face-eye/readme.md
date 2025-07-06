@@ -43,6 +43,8 @@ app.config['MAIN_BACKEND_URL'] = 'http://123.207.53.16:9527/api/interview/proces
 
 但后续的轮询需要token【在代码里面】
 
+5.app.py中：1.访问后端的ip需要改 2.访问redis的密码需要改 3.端口号可改
+
 # 2.原生
 
 ## 功能简介

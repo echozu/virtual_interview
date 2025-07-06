@@ -14,6 +14,7 @@ import os
 import time
 import uuid  # 用于生成唯一文件名
 from flask_cors import CORS  # 导入CORS
+from celery import Celery
 
 # 导入我们新的分析模块
 from analysis_module import analyze_interview_data
@@ -21,17 +22,33 @@ import requests
 # --- 初始化 ---
 
 # 初始化 Flask 应用
+# 1. 初始化 Flask 应用
+# 1. 初始化 Flask 应用
 app = Flask(__name__)
-# 启用CORS，允许你的前端项目进行跨域调用
 CORS(app)
+
+# 2. 配置应用参数
 app.config['MAIN_BACKEND_URL'] = 'http://123.207.53.16:9527/api/interview/process/python/video_analyse'
-# 定义上传文件存放的目录
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# 加载dlib的面部检测器和关键点预测器
+# ✅ 3. 配置 Celery
+#    使用 Celery 5.x+ 的小写配置名，以解决版本冲突问题。
+#    请将 'your_password_here' 替换为您的真实 Redis 密码。
+app.config.update(
+    broker_url='redis://:***REMOVED***@123.207.53.16:6379/9',
+    result_backend='redis://:***REMOVED***@123.207.53.16:6379/9'
+)
+
+# 创建 Celery 实例
+celery = Celery(app.name)
+# 从 Flask 的 app.config 中加载配置
+celery.conf.update(app.config)
+
+
+# 4. 加载 dlib 模型和定义常量
 try:
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
@@ -39,8 +56,9 @@ except RuntimeError:
     print("错误：请确保 'shape_predictor_68_face_landmarks.dat' 文件存在于项目根目录。")
     exit()
 
-# 眨眼率阈值
 BLINK_RATIO_THRESHOLD = 4.5
+FRAME_PROCESSING_INTERVAL = 3
+FRAME_RESIZE_FACTOR = 0.5
 
 
 # --- 辅助函数 ---
@@ -111,9 +129,7 @@ def get_facial_expression_proxies(landmarks):
     return {'mouth_opening_ratio': mouth_opening / face_width, 'mouth_smile_ratio': mouth_width / face_width}
 
 
-# --- 主视频处理与数据聚合函数 ---
-
-# --- 主视频处理与数据聚合函数 (已修改) ---
+# --- 主视频处理与数据聚合函数 (已优化) ---
 def process_video(video_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened(): return None
@@ -125,7 +141,6 @@ def process_video(video_path):
     total_frame_count = 0
     is_blinking = False
 
-    # ✅ --- 新增变量: 用于存储首尾帧 ---
     first_frame_base64 = None
     last_frame_np = None
 
@@ -133,18 +148,20 @@ def process_video(video_path):
         ret, frame = cap.read()
         if not ret: break
 
-        # ✅ --- 新增逻辑: 捕获并编码第一帧 ---
+        total_frame_count += 1
+
+        # ✅ 优化点 1: 帧采样
+        # 只处理间隔帧，跳过中间的帧，大幅提升速度
+        if total_frame_count % FRAME_PROCESSING_INTERVAL != 0:
+            continue
+
         if first_frame_base64 is None:
-            # 将帧编码为JPEG格式的二进制数据
             success, buffer = cv2.imencode('.jpg', frame)
             if success:
-                # 将二进制数据进行Base64编码，并转为UTF-8字符串
                 first_frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
-        # ✅ --- 新增逻辑: 持续更新最后一帧 ---
-        last_frame_np = frame.copy() # 使用copy确保我们得到独立的帧
+        last_frame_np = frame.copy()
 
-        total_frame_count += 1
         second_marker = int((total_frame_count - 1) / fps)
 
         if second_marker > current_second:
@@ -159,7 +176,7 @@ def process_video(video_path):
 
                 analysis_results_by_second.append({
                     "time_in_seconds": current_second + 1,
-                    "face_detection_rate": len(valid_frames) / len(frame_data_in_second),
+                    "face_detection_rate": len(valid_frames) / len(frame_data_in_second) if frame_data_in_second else 0,
                     "attention_mean": np.mean(attention_scores) if attention_scores else 0,
                     "attention_std": np.std(attention_scores) if attention_scores else 0,
                     "blink_count": sum(d['is_blinking'] for d in frame_data_in_second),
@@ -173,28 +190,44 @@ def process_video(video_path):
             frame_data_in_second = []
             current_second = second_marker
 
-        frame_height, frame_width, _ = frame.shape
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # ✅ 优化点 2: 降低分辨率
+        # 在分析前缩小图像，dlib处理小图像速度快很多
+        small_frame = cv2.resize(frame, (0, 0), fx=FRAME_RESIZE_FACTOR, fy=FRAME_RESIZE_FACTOR)
+        gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+
+        # 在缩小的灰度图上进行人脸检测
         faces = detector(gray)
 
         frame_analysis = {"face_detected": False, "attention_score": 0.0, "is_blinking": False, "head_pose": {},
                           "expression": {}}
         if len(faces) > 0:
-            landmarks = predictor(gray, faces[0])
+            # 从检测到的人脸获取关键点
+            landmarks_small = predictor(gray, faces[0])
+
+            # 将关键点坐标转换回原始尺寸，以便进行后续依赖原始尺寸的计算（如果需要）
+            # 注意：这里我们创建一个新的 dlib.full_object_detection 对象来存储放大后的点
+            points = [dlib.point(int(p.x / FRAME_RESIZE_FACTOR), int(p.y / FRAME_RESIZE_FACTOR)) for p in
+                      landmarks_small.parts()]
+            landmarks = dlib.full_object_detection(faces[0], points)
+
             frame_analysis.update({
                 "face_detected": True,
-                "attention_score": 0.3,
+                "attention_score": 0.3,  # 默认值
                 "head_pose": dict(zip(['pitch', 'yaw', 'roll'], get_head_pose(landmarks, frame.shape))),
                 "expression": get_facial_expression_proxies(landmarks)
             })
-            if (blinking_ratio := (get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks) + get_blinking_ratio(
-                    [42, 43, 44, 45, 46, 47], landmarks)) / 2) > BLINK_RATIO_THRESHOLD:
+
+            blinking_ratio = (get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks) + get_blinking_ratio(
+                [42, 43, 44, 45, 46, 47], landmarks)) / 2
+            if blinking_ratio > BLINK_RATIO_THRESHOLD:
                 if not is_blinking: frame_analysis["is_blinking"] = True
                 is_blinking = True
             else:
                 is_blinking = False
 
-            gaze_ratio = get_gaze_ratio(frame, [36, 37, 38, 39, 40, 41], landmarks, gray)
+            # 注意：get_gaze_ratio 也需要使用原始尺寸的灰度图
+            original_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gaze_ratio = get_gaze_ratio(frame, [36, 37, 38, 39, 40, 41], landmarks, original_gray)
             if gaze_ratio is not None and 0.8 < gaze_ratio < 2.2:
                 frame_analysis["attention_score"] = 1.0
             else:
@@ -210,7 +243,6 @@ def process_video(video_path):
 
     cap.release()
 
-    # ✅ --- 修改返回结构: 同时返回分析数据和帧图像数据 ---
     return {
         "video_duration_seconds": round(total_frame_count / fps, 2),
         "analysis_by_second": analysis_results_by_second,
@@ -424,7 +456,48 @@ def run_analysis_and_forward(video_path, session_id, analysis_id, main_backend_u
             os.remove(video_path)
             print(f"后台任务 [{analysis_id}]: 已删除临时视频文件 {video_path}")
 
+# --- Celery 任务定义 ---
+@celery.task
+def run_analysis_and_forward(video_path, session_id, analysis_id, main_backend_url):
+    """
+    这个函数现在是一个 Celery 任务，将由 Celery worker 在后台执行。
+    """
+    try:
+        print(f"Celery 任务 [{analysis_id}] 开始分析视频: {video_path}")
+        start_time = time.time()
+        raw_results = process_video(video_path)
+        if raw_results is None or not raw_results.get("analysis_by_second"):
+            print(f"错误 [{analysis_id}]: 视频处理失败或未检测到有效活动")
+            return
+        analysis_data = raw_results["analysis_by_second"]
+        half_minute_report = aggregate_data_by_interval(analysis_data, 30)
+        for report_block in half_minute_report:
+            nervousness_analysis = calculate_nervousness_score(report_block)
+            report_block['nervousness_analysis'] = nervousness_analysis
+        interview_summary = analyze_interview_data(half_minute_report)
+        end_time = time.time()
+        print(f"Celery 任务 [{analysis_id}] 分析完成，耗时: {end_time - start_time:.2f} 秒")
+        final_response_to_main_backend = {
+            "analysisId": analysis_id, "sessionId": session_id, "status": "success", "message": "视频分析成功",
+            "analysis_by_half_minute": half_minute_report, "overall_summary": interview_summary,
+            "raw_data_by_second": analysis_data, "first_frame_base64": raw_results.get("first_frame_base64"),
+            "last_frame_base64": raw_results.get("last_frame_base64")
+        }
+        print(f"Celery 任务 [{analysis_id}] 正在将结果转发至: {main_backend_url}")
+        try:
+            requests.post(main_backend_url, json=final_response_to_main_backend, timeout=20).raise_for_status()
+            print(f"Celery 任务 [{analysis_id}] 成功将数据转发至主后端。")
+        except requests.exceptions.RequestException as e:
+            print(f"错误 [{analysis_id}]: 转发至主后端失败: {e}")
+    except Exception as e:
+        print(f"Celery 任务 [{analysis_id}] 处理过程中发生严重错误: {e}")
+    finally:
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            print(f"Celery 任务 [{analysis_id}]: 已删除临时视频文件 {video_path}")
 
+
+# --- Flask API 路由 ---
 @app.route('/api/analyze_video', methods=['POST'])
 def analyze_video_api():
     if 'video' not in request.files: return jsonify({"error": "请求中未找到视频文件"}), 400
@@ -434,28 +507,20 @@ def analyze_video_api():
     session_id = request.form.get('sessionId')
     if file.filename == '': return jsonify({"error": "未选择文件"}), 400
 
-    # ✅ 1. 生成唯一的、符合您格式要求的 analysisId
     timestamp = int(time.time())
     random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
     analysis_id = f"{session_id}-{timestamp}-{random_str}"
-
-    filename = f"{analysis_id}-{os.path.basename(file.filename)}"
+    filename = f"{analysis_id}.webm"
     video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-    # 保存文件
     file.save(video_path)
 
-    # ✅ 2. 启动后台线程执行耗时任务
+    # ✅ 改动点: 不再创建线程，而是调用 Celery 任务
+    # 使用 .delay() 方法将任务发送到 Redis 队列中，然后立即返回
     main_backend_url = app.config['MAIN_BACKEND_URL']
-    thread = threading.Thread(
-        target=run_analysis_and_forward,
-        args=(video_path, session_id, analysis_id, main_backend_url)
-    )
-    thread.start()
+    run_analysis_and_forward.delay(video_path, session_id, analysis_id, main_backend_url)
 
-    print(f"已为会话 {session_id} 创建分析任务，ID为: {analysis_id}")
+    print(f"已为会话 {session_id} 创建 Celery 任务，ID为: {analysis_id}")
 
-    # ✅ 3. 立即向前端返回 analysisId
     return jsonify({
         "status": "processing",
         "message": "分析任务已成功创建，正在后台处理中。",
