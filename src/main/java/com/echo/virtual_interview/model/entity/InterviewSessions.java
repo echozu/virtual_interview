@@ -52,18 +52,13 @@ public class InterviewSessions implements Serializable {
     @SchemaProperty(name = "面试结束时间")
     private LocalDateTime endedAt;
 
-    @SchemaProperty(name = "是否开启视频")
-    private Boolean videoEnabled;
-
-    @SchemaProperty(name = "是否开启麦克风")
-    private Boolean micEnabled;
-
     @SchemaProperty(name = "反馈模式('实时反馈', '模拟面试')")
     private String feedbackMode;
 
     @SchemaProperty(name = "面试综合得分")
     private BigDecimal overallScore;
-
+    @SchemaProperty(name = "此场面试的整体分析[结合了每一轮的分析]")
+    private String overallAnalysis;
     @SchemaProperty(name = "记录创建时间")
     private LocalDateTime createdAt;
 

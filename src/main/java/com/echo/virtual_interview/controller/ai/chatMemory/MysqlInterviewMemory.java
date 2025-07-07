@@ -24,30 +24,19 @@ public class MysqlInterviewMemory implements ChatMemory {
 
     private final InterviewDialogueMapper dialogueMapper;
 
+    /**
+     *
+     * 此方法体被清空，不再执行任何数据库插入操作。
+     * 满足了 ChatMemory 接口的要求，但实际上是一个空操作 (no-op)。
+     */
     @Override
     public void add(String sessionId, List<Message> messages) {
-        int currentMaxSequence = dialogueMapper.getMaxSequence(sessionId);
-
-        int seq = currentMaxSequence + 1;
-        for (Message message : messages) {
-            InterviewDialogue dialogue = new InterviewDialogue();
-            dialogue.setSessionId(sessionId);
-            dialogue.setSequence(seq++);
-            dialogue.setTimestamp(LocalDateTime.now());
-
-            if (message instanceof UserMessage userMsg) {
-                dialogue.setUserMessage(userMsg.getText());
-            } else if (message instanceof AssistantMessage aiMsg) {
-                dialogue.setAiMessage(aiMsg.getText());
-            } else {
-                // 其他消息类型也可以支持
-                dialogue.setUserMessage("[系统消息] " + message.getText());
-            }
-
-            dialogueMapper.insert(dialogue);
-        }
+        // 在其他逻辑IInterviewServiceImpl中的interviewProcess中实现了 ai面试时，对每轮对话的存储，所以这里不做存储
     }
 
+    /**
+     * 继续从数据库中读取历史记录。
+     */
     @Override
     public List<Message> get(String sessionId, int lastN) {
         List<Message> messages = dialogueMapper.selectLastNMessages(sessionId, lastN).stream()
@@ -67,7 +56,9 @@ public class MysqlInterviewMemory implements ChatMemory {
         return messages;
     }
 
-
+    /**
+     * 用于清除会话历史。
+     */
     @Override
     public void clear(String sessionId) {
         dialogueMapper.deleteBySessionId(sessionId);

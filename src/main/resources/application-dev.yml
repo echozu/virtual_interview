@@ -14,7 +14,7 @@ echo:
     host: 127.0.0.1
     port: 6379
     password: ***REMOVED***
-    database: 0
+    database: 3 #9是py的
   oss:
     endpoint: oss-cn-guangzhou.aliyuncs.com
     access-key-id: ***REMOVED***

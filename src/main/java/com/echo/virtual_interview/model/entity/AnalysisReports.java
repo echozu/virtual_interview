@@ -35,7 +35,7 @@ public class AnalysisReports implements Serializable {
     private Long id;
 
     @SchemaProperty(name = "对应的面试会话ID")
-    private Long sessionId;
+    private String sessionId;
 
     @SchemaProperty(name = "报告生成时间")
     private LocalDateTime generatedAt;
@@ -70,8 +70,6 @@ public class AnalysisReports implements Serializable {
     @Schema(description = "紧张度曲线数据（JSON数组格式）", example = "[{\"time\": \"01:30\", \"value\": 20}]")
     private String tensionCurveData;
 
-    @Schema(description = "专业度-问题逐题分析（JSON数组格式）", example = "[{\"question\": \"自我介绍\", \"answer\": \"...\", \"score\": 85, \"suggestion\": \"建议更结构化\"}]")
-    private String questionAnalysisData;
 
     @Schema(description = "综合建议文本")
     private String overallSuggestions;

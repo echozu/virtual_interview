@@ -13,7 +13,7 @@ echo:
   redis:
     host: 123.207.53.16
     port: 6379
-    database: 3
+    database: 3 #9是py的
     password: ***REMOVED***
   oss:
     endpoint: oss-cn-guangzhou.aliyuncs.com

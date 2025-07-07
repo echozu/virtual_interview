@@ -44,6 +44,10 @@ public class InterviewDialogue implements Serializable {
 
     @SchemaProperty(name = "用户回答的内容或提问的问题")
     private String userMessage;
+    @SchemaProperty(name = "该论对话的分数")
+    private Integer turnScore;
+    @SchemaProperty(name = "该论对话的建议")
+    private String turnSuggestion;
 
     @SchemaProperty(name = "消息时间戳（精确到毫秒）")
     private LocalDateTime timestamp;

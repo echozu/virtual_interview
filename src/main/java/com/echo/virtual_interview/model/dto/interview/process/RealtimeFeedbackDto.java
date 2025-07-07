@@ -3,7 +3,9 @@
 // =====================================================================================
 package com.echo.virtual_interview.model.dto.interview.process;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Map;
 
@@ -12,6 +14,8 @@ import java.util.Map;
 
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class RealtimeFeedbackDto {
     //总结性反馈
     private String summary;
@@ -20,8 +24,6 @@ public class RealtimeFeedbackDto {
     //状态标识 (POSITIVE 或 NEEDS_IMPROVEMENT)
     private String status;
     //用于后台存储的详细分析
-    private Map<String, String> detailedAnalysis;
+    private String detailedAnalysis;
 
-    public RealtimeFeedbackDto(String s, String s1, String needsImprovement, Object o) {
-    }
 }

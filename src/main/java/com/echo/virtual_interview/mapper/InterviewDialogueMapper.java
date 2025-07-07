@@ -18,11 +18,6 @@ import java.util.List;
  * @since 2025-06-20
  */
 public interface InterviewDialogueMapper extends BaseMapper<InterviewDialogue> {
-    @Insert("""
-        INSERT INTO interview_dialogue (session_id, sequence, ai_message, user_message, timestamp)
-        VALUES (#{sessionId}, #{sequence}, #{aiMessage}, #{userMessage}, #{timestamp})
-    """)
-    int insert(InterviewDialogue dialogue);
 
     @Select("""
         SELECT * FROM interview_dialogue
@@ -41,4 +36,13 @@ public interface InterviewDialogueMapper extends BaseMapper<InterviewDialogue> {
         DELETE FROM interview_dialogue WHERE session_id = #{sessionId}
     """)
     void deleteBySessionId(@Param("sessionId") String sessionId);
+
+    /**
+     * 查找指定会话中最新的一条等待用户回答的对话记录
+     * (即 user_message 为 NULL 的记录)
+     * @param sessionId 会话ID
+     * @return InterviewDialogue 实体
+     */
+    @Select("SELECT * FROM interview_dialogue WHERE session_id = #{sessionId} AND user_message IS NULL ORDER BY sequence DESC LIMIT 1")
+    InterviewDialogue findLatestPendingDialogue(@Param("sessionId") String sessionId);
 }

@@ -310,16 +310,13 @@ public class AsrProcessingService {
     }
 
     /**
-     * 【全新】处理来自AI服务的流式文本响应，并分段进行TTS。
-     */
-    /**
-     * 【全新】处理来自AI服务的流式文本响应，并分段进行TTS。
+     * 处理来自AI服务的流式文本响应，并分段进行TTS。
      */
     private void handleStreamingAiResponse(String fullText, String sessionId, Integer userId) {
         log.info("[业务流] 会话: {}, 用户: {}. 完整识别文本: '{}' -> 即将流式请求AI并转为语音", sessionId, userId, fullText);
 
         // 为本次AI回复创建一个唯一的句子处理器
-        // 【修改点】传入一个原子计数器来追踪待完成的TTS任务数
+        // 传入一个原子计数器来追踪待完成的TTS任务数
         SentenceProcessor processor = new SentenceProcessor(userId, new AtomicInteger(0));
 
         // 调用AI服务，并订阅其返回的流式文本
@@ -354,13 +351,13 @@ public class AsrProcessingService {
     }
 
     /**
-     * 【全新】将一个完整的句子发送到TTS服务进行合成
+     * 将一个完整的句子发送到TTS服务进行合成
      * @param sentence 要合成的句子
      * @param userId 目标用户ID
      * @param isFinalSentence 这是否是整个AI回复的最后一个句子
      */
     /**
-     * 【全新】将一个完整的句子发送到TTS服务进行合成
+     * 将一个完整的句子发送到TTS服务进行合成
      */
     private void sendCompleteSentenceToTTS(String sentence, Integer userId, Runnable onSynthesisComplete) {
         if (!StringUtils.hasText(sentence)) {
@@ -379,7 +376,7 @@ public class AsrProcessingService {
             );
         };
 
-        // 【修改点】onComplete不再关心是否是最后一句，它只负责调用传入的回调
+        // onComplete不再关心是否是最后一句，它只负责调用传入的回调
         Runnable onComplete = () -> {
             log.info("句子 '{}' 合成完毕。", sentence);
             if (onSynthesisComplete != null) onSynthesisComplete.run();
@@ -399,7 +396,7 @@ public class AsrProcessingService {
     }
 
     /**
-     * 【全新】向指定用户发送音频流结束的信号。
+     * 向指定用户发送音频流结束的信号。
      */
     private void sendFinalAudioSignalToUser(Integer userId) {
         log.info("AI回复语音全部合成完毕，向用户 {} 发送结束信号。", userId);
@@ -471,7 +468,7 @@ public class AsrProcessingService {
         }
 
         /**
-         * 【关键修复】当一个TTS任务（成功或失败）完成时，调用此方法。
+         * 当一个TTS任务（成功或失败）完成时，调用此方法。
          */
         private void onTaskCompleted() {
             // 一个任务完成，计数器减1
@@ -483,7 +480,7 @@ public class AsrProcessingService {
         }
 
         /**
-         * 【关键修复】检查是否满足所有结束条件（不修改计数器）
+         * 检查是否满足所有结束条件（不修改计数器）
          */
         private void checkIfAllDone() {
             // 必须同时满足两个条件：

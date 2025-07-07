@@ -70,7 +70,7 @@ public class ResultUtils {
      * @param response 响应对象
      */
     private static void logResponse(String type, BaseResponse<?> response) {
-        String border = "==================================================";
+        String border = "======================================================";
         String header = String.format("%s\n[%s] 返回给前端的响应\n%s", border, type, border);
 
         String body = String.format(

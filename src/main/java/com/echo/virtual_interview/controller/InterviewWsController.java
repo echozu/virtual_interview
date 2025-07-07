@@ -26,20 +26,14 @@ public class InterviewWsController {
 
     private final IInterviewService interviewService;
     private final AsrProcessingService asrProcessingService;
-    private final IInterviewSessionsService interviewSessionsService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final InterviewExpert interviewExpert;
 
-    // --- 最佳实践：使用一个构造函数完成所有依赖注入 ---
     public InterviewWsController(IInterviewService interviewService,
-                               IInterviewSessionsService interviewSessionsService,
                                SimpMessagingTemplate messagingTemplate,
-                               AsrProcessingService asrProcessingService, InterviewExpert interviewExpert) {
+                               AsrProcessingService asrProcessingService) {
         this.interviewService = interviewService;
-        this.interviewSessionsService = interviewSessionsService;
         this.messagingTemplate = messagingTemplate;
         this.asrProcessingService = asrProcessingService;
-        this.interviewExpert = interviewExpert;
     }
 
     /**语音--文本（ai）---语音

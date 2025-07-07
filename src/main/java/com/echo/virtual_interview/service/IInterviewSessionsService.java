@@ -16,7 +16,4 @@ import jakarta.validation.constraints.NotBlank;
  */
 public interface IInterviewSessionsService extends IService<InterviewSessions> {
 
-    String start(@NotBlank Long channelId);
-
-    RealtimeFeedbackDto processAndStoreAnalysis(VideoAnalysisPayload payload);
 }

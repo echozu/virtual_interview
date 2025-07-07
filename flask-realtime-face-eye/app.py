@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # 2. 配置应用参数
-app.config['MAIN_BACKEND_URL'] = 'http://123.207.53.16:9527/api/interview/process/python/video_analyse'
+app.config['MAIN_BACKEND_URL'] = 'http://localhost:9527/api/interview/process/python/video_analyse'
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -38,8 +38,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 #    使用 Celery 5.x+ 的小写配置名，以解决版本冲突问题。
 #    请将 'your_password_here' 替换为您的真实 Redis 密码。
 app.config.update(
-    broker_url='redis://:***REMOVED***@123.207.53.16:6379/9',
-    result_backend='redis://:***REMOVED***@123.207.53.16:6379/9'
+    broker_url='redis://:***REMOVED***@localhost:6379/9',
+    result_backend='redis://:***REMOVED***@localhost:6379/9'
 )
 
 # 创建 Celery 实例
@@ -393,68 +393,56 @@ def calculate_nervousness_score(half_minute_data):
     }
 
 
-# 这是您原有的分析逻辑，我们将其封装成一个函数，以便在后台线程中调用
+# --- Celery 任务定义 ---
+@celery.task
 def run_analysis_and_forward(video_path, session_id, analysis_id, main_backend_url):
     """
-    这个函数在后台线程中执行所有耗时操作。
+    这个函数现在是一个 Celery 任务，将由 Celery worker 在后台执行。
     """
     try:
-        print(f"后台任务 [{analysis_id}] 开始分析视频: {video_path}")
+        print(f"Celery 任务 [{analysis_id}] 开始分析视频: {video_path}")
         start_time = time.time()
-
-        # 1. 视频分析 (这部分代码与您原来的一样)
         raw_results = process_video(video_path)
         if raw_results is None or not raw_results.get("analysis_by_second"):
             print(f"错误 [{analysis_id}]: 视频处理失败或未检测到有效活动")
-            # [可选] 您可以在这里调用Java后端接口，通知任务失败
             return
 
+        # 这里的 analysis_data 变量依然存在，但我们不会再把它发送给Java后端
         analysis_data = raw_results["analysis_by_second"]
         half_minute_report = aggregate_data_by_interval(analysis_data, 30)
-
         for report_block in half_minute_report:
             nervousness_analysis = calculate_nervousness_score(report_block)
             report_block['nervousness_analysis'] = nervousness_analysis
 
-        interview_summary = analyze_interview_data(analysis_data)
-
+        interview_summary = analyze_interview_data(half_minute_report)
         end_time = time.time()
-        print(f"后台任务 [{analysis_id}] 分析完成，耗时: {end_time - start_time:.2f} 秒")
+        print(f"Celery 任务 [{analysis_id}] 分析完成，耗时: {end_time - start_time:.2f} 秒")
 
-        # 2. 准备发送给主后端的数据包
+        # ✅ 关键改动：构建一个更小的、只包含必要信息的JSON包
+        # 我们移除了 "raw_data_by_second" 字段，以避免超出AI模型的Token限制
         final_response_to_main_backend = {
-            "analysisId": analysis_id,  # ✅ 关键：将 analysisId 也发给Java后端
+            "analysisId": analysis_id,
             "sessionId": session_id,
             "status": "success",
             "message": "视频分析成功",
             "analysis_by_half_minute": half_minute_report,
             "overall_summary": interview_summary,
-            "raw_data_by_second": analysis_data,
             "first_frame_base64": raw_results.get("first_frame_base64"),
             "last_frame_base64": raw_results.get("last_frame_base64")
         }
-        print(f"分析结果是 [{final_response_to_main_backend}]")
-        # 3. 将分析结果发送到您的主后端
-        print(f"后台任务 [{analysis_id}] 正在将结果转发至: {main_backend_url}")
+
+        print(f"Celery 任务 [{analysis_id}] 正在将精简后的结果转发至: {main_backend_url}")
         try:
-            forward_response = requests.post(
-                main_backend_url,
-                json=final_response_to_main_backend,
-                timeout=20  # 转发可以设置稍长的超时
-            )
-            forward_response.raise_for_status()
-            print(f"后台任务 [{analysis_id}] 成功将数据转发至主后端。")
+            requests.post(main_backend_url, json=final_response_to_main_backend, timeout=20).raise_for_status()
+            print(f"Celery 任务 [{analysis_id}] 成功将数据转发至主后端。")
         except requests.exceptions.RequestException as e:
             print(f"错误 [{analysis_id}]: 转发至主后端失败: {e}")
-            # [可选] 您可以在这里调用Java后端接口，通知任务失败
-
     except Exception as e:
-        print(f"后台任务 [{analysis_id}] 处理过程中发生严重错误: {e}")
+        print(f"Celery 任务 [{analysis_id}] 处理过程中发生严重错误: {e}")
     finally:
-        # 4. 清理临时文件
         if os.path.exists(video_path):
             os.remove(video_path)
-            print(f"后台任务 [{analysis_id}]: 已删除临时视频文件 {video_path}")
+            print(f"Celery 任务 [{analysis_id}]: 已删除临时视频文件 {video_path}")
 
 # --- Celery 任务定义 ---
 @celery.task

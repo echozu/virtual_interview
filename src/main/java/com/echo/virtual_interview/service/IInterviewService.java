@@ -1,7 +1,17 @@
 package com.echo.virtual_interview.service;
 
+import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
+import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPayload;
 import reactor.core.publisher.Flux;
 
 public interface IInterviewService {
     Flux<String> interviewProcess(String message, String chatId, Integer userId);
+
+    void end(Integer userId,String sessionId);
+
+    String start(Long channelId);
+
+    RealtimeFeedbackDto processAndStoreAnalysis(VideoAnalysisPayload payload);
+
+    void generateAndSendGreetingAudio(String sessionId, Integer userId);
 }

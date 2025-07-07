@@ -32,7 +32,7 @@ if __name__ == '__main__':
 app = Flask(__name__)
 # 启用CORS，允许你的前端项目进行跨域调用
 CORS(app)
-app.config['MAIN_BACKEND_URL'] = 'http://123.207.53.16:9527/api/interview/process/python/video_analyse'
+app.config['MAIN_BACKEND_URL'] = 'http://localhost:9527/api/interview/process/python/video_analyse'
 ```
 
 4.测试文件：
@@ -44,6 +44,90 @@ app.config['MAIN_BACKEND_URL'] = 'http://123.207.53.16:9527/api/interview/proces
 但后续的轮询需要token【在代码里面】
 
 5.app.py中：1.访问后端的ip需要改 2.访问redis的密码需要改 3.端口号可改
+
+6.clery启动需要：windows：celery -A app.celery worker --loglevel=info -P solo
+
+宝塔；
+
+```
+第1步：安装进程管理器插件
+登录您的宝塔面板。
+
+进入左侧菜单的 “软件商店”。
+
+在搜索框中搜索 “Supervisor” 或者 “进程管理器”。
+
+如果尚未安装，请点击 “安装”。
+
+第2步：添加 Gunicorn 进程 (用于运行 Flask)
+在生产环境中，我们不再使用 Flask 自带的 app.run()，而是用一个更专业的 WSGI 服务器，比如 Gunicorn。
+
+安装 Gunicorn:
+首先，请确保您的项目虚拟环境中已经安装了 Gunicorn。如果没有，请通过 SSH 连接到您的服务器，进入项目目录并运行：
+
+Bash
+
+# 激活你的虚拟环境，例如：
+# source /www/wwwroot/your_project_folder/.venv/bin/activate
+pip install gunicorn
+在进程管理器中添加新进程:
+
+打开 “进程管理器” 插件。
+
+点击 “添加进程” 按钮。
+
+填写以下信息：
+
+名称: my_video_app_gunicorn (或者任何您喜欢的名字)
+
+启动用户: 通常选择 www。
+
+运行目录: 选择您项目的完整路径，例如 /www/wwwroot/FLASK-Real-time-face-recognition-and-eye-ball-tracking-master。
+
+启动命令: 这是最关键的一步。填入以下命令：
+
+Bash
+
+/www/server/pyporject_evn/flask-realtime-face-eye_venv/bin/celery -A app.celery worker --loglevel
+-w 4 表示启动4个工作进程来处理请求（可以根据您服务器的CPU核心数调整）。
+
+-b 0.0.0.0:55274 表示监听所有IP地址的 55274 端口。
+
+app:app 的意思是 “运行 app.py 文件中的名为 app 的 Flask 实例”。
+
+点击 “确定” 保存。
+
+第3步：添加 Celery Worker 进程
+现在，我们用同样的方式添加 Celery Worker。
+
+在进程管理器中再次点击 “添加进程”:
+
+名称: my_video_app_celery (或者任何您喜欢的名字)
+
+启动用户: 同样选择 www。
+
+运行目录: 选择相同的项目路径。
+
+启动命令: 填入以下命令：
+
+Bash
+
+/www/server/pyporject_evn/flask-realtime-face-eye_venv/bin/gunicorn -w 4 -b 0.0.0.0:55274 app:app
+注意: 因为宝塔面板通常运行在 Linux 系统上，所以我们不再需要之前在 Windows 上使用的 -P solo 或 -P gevent 参数了。使用默认的 prefork 模式在 Linux 上性能更好。
+
+点击 “确定” 保存。
+
+总结
+完成以上步骤后，您应该能在进程管理器列表中看到两个正在运行的进程：my_video_app_gunicorn 和 my_video_app_celery。
+
+Gunicorn 负责接收来自前端的 HTTP 请求。
+
+Celery 负责在后台处理耗时的视频分析任务。
+
+Supervisor 会确保这两个进程一直在后台运行，如果意外崩溃了，它还会自动尝试重启它们。您也可以直接在进程管理器的界面中查看每个进程的实时日志，非常方便。
+```
+
+
 
 # 2.原生
 
