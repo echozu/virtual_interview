@@ -1,14 +1,13 @@
 package com.echo.virtual_interview.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.controller.ai.InterviewExpert;
 import com.echo.virtual_interview.exception.BusinessException;
-import com.echo.virtual_interview.mapper.AnalysisReportsMapper;
-import com.echo.virtual_interview.mapper.InterviewAnalysisChunkMapper;
-import com.echo.virtual_interview.mapper.InterviewDialogueMapper;
-import com.echo.virtual_interview.mapper.InterviewSessionsMapper;
+import com.echo.virtual_interview.mapper.*;
+import com.echo.virtual_interview.model.dto.history.InterviewHistoryCardDTO;
 import com.echo.virtual_interview.model.dto.interview.AnalysisReportDTO;
 import com.echo.virtual_interview.model.dto.interview.TurnAnalysisResponse;
 import com.echo.virtual_interview.model.dto.interview.audio.AudioResponseDto;
@@ -593,7 +592,99 @@ public class IInterviewServiceImpl implements IInterviewService {
 
         }
     }
+    @Resource
+    private  InterviewSessionsMapper interviewSessionMapper;
+    @Resource
+    private  InterviewChannelsMapper interviewChannelMapper;
+    @Override
+    public List<InterviewHistoryCardDTO> getHistoryForUser(Integer userId) {
+        // 1. 根据用户ID查询所有相关的面试会话记录，按开始时间降序排列
+        LambdaQueryWrapper<InterviewSessions> sessionQuery = new LambdaQueryWrapper<>();
+        sessionQuery.eq(InterviewSessions::getUserId, userId)
+                .orderByDesc(InterviewSessions::getStartedAt);
+        List<InterviewSessions> sessions = interviewSessionsMapper.selectList(sessionQuery);
 
+        if (sessions.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. 提取所有不重复的 channel_id，以避免N+1查询问题
+        List<Long> channelIds = sessions.stream()
+                .map(InterviewSessions::getChannelId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 3. 一次性查询出所有相关的频道信息
+        Map<Long, InterviewChannels> channelMap = interviewChannelMapper.selectBatchIds(channelIds)
+                .stream()
+                .collect(Collectors.toMap(InterviewChannels::getId, channel -> channel));
+
+        // 4. 组装返回给前端的DTO列表
+        return sessions.stream().map(session -> {
+            InterviewHistoryCardDTO dto = new InterviewHistoryCardDTO();
+            dto.setId(session.getId());
+
+            // 【重要修复】增加对 startedAt 字段的空值判断，防止NullPointerException
+            // 如果 startedAt 为空，则使用 createdAt 作为备用日期
+            LocalDateTime interviewTime = session.getStartedAt() != null ? session.getStartedAt() : session.getCreatedAt();
+            if (interviewTime != null) {
+                dto.setInterviewDate(interviewTime.toLocalDate());
+            }
+
+            dto.setStatus(mapStatusToFrontend(session.getStatus())); // 状态映射
+            dto.setProgress(calculateProgress(session.getStatus())); // 进度计算
+            dto.setOverallScore(session.getOverallScore());
+
+            // 从Map中获取对应的频道信息
+            InterviewChannels channel = channelMap.get(session.getChannelId());
+            if (channel != null) {
+                dto.setPosition(channel.getTargetPosition());
+                dto.setInterviewType(channel.getTitle());
+                dto.setImageUrl(channel.getImageUrl());
+            } else {
+                // 如果频道信息不存在（例如被删除或数据异常），提供默认值
+                dto.setPosition("快速面试");
+                dto.setInterviewType("综合面试");
+            }
+            return dto;
+        }).collect(Collectors.toList());
+    }
+    /**
+     * 辅助方法：将后端的中文状态映射为前端需要的英文状态
+     * @param dbStatus 数据库中的状态
+     * @return 前端所需的状态
+     */
+    private String mapStatusToFrontend(String dbStatus) {
+        switch (dbStatus) {
+            case "已完成":
+                return "completed";
+            case "进行中":
+            case "准备中":
+                return "pending";
+            case "已取消":
+                return "cancelled";
+            default:
+                return "unknown";
+        }
+    }
+
+    /**
+     * 辅助方法：根据后端状态计算面试进度
+     * @param dbStatus 数据库中的状态
+     * @return 进度百分比
+     */
+    private int calculateProgress(String dbStatus) {
+        switch (dbStatus) {
+            case "已完成":
+                return 100;
+            case "进行中":
+                return 75;
+            case "准备中":
+                return 30;
+            default:
+                return 0;
+        }
+    }
     /**
      * 将固定的开场白作为第一轮对话存入数据库。
      *

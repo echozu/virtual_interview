@@ -5,6 +5,7 @@ import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.common.ResultUtils;
 import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.model.dto.analysis.InterviewReportResponseDTO;
+import com.echo.virtual_interview.model.dto.history.InterviewHistoryCardDTO;
 import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
 import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPayload;
 import com.echo.virtual_interview.service.IAnalysisReportsService;
@@ -17,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 面试接口
@@ -115,7 +118,16 @@ public class InterviewController {
         interviewService.end(userId,sessionId);
         return ResultUtils.success("结束面试成功");
     }
-
+    /**
+     * 获取当前用户的面试历史记录列表
+     * @return 包含面试历史卡片信息的列表
+     */
+    @GetMapping("/history/list")
+    public BaseResponse<List<InterviewHistoryCardDTO>> getHistory() {
+        Integer userId = UserIdContext.getUserIdContext();
+        List<InterviewHistoryCardDTO> historyList = interviewService.getHistoryForUser(userId);
+        return ResultUtils.success(historyList);
+    }
     /**
      * 获取指定面试会话的完整分析报告-有缓存
      * @param sessionId 面试会话的唯一ID
