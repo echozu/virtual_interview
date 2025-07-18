@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.*;
@@ -23,7 +25,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class XunFeiChatModel implements ChatModel, StreamingChatModel {
@@ -105,17 +106,54 @@ public class XunFeiChatModel implements ChatModel, StreamingChatModel {
         return requestBody;
     }
 
-    private String extractContent(String json) throws Exception {
-        JsonNode root = objectMapper.readTree(json);
+    private static final Logger log = LoggerFactory.getLogger(XunFeiChatModel.class);
 
-        // 兼容流式响应结构：choices[0].delta.content
-        JsonNode deltaContent = root.path("choices").get(0).path("delta").path("content");
-        if (!deltaContent.isMissingNode()) {
-            return deltaContent.asText(); // 流式时走这个
+    private String extractContent(String json) throws Exception {
+        if (json == null || json.isEmpty()) {
+            log.warn("传入的 JSON 字符串为空或 null");
+            return "";
         }
 
-        // 非流式结构（兼容旧逻辑）
-        return root.path("choices").get(0).path("message").path("content").asText();
+        JsonNode root = objectMapper.readTree(json);
+
+        // 打印原始 JSON 数据，便于调试
+        log.info("接收到的 JSON 响应：{}", root.toPrettyString());
+
+        // 检查 choices 是否存在且是数组，并且不为空
+        if (!root.has("choices") || !root.get("choices").isArray() || root.get("choices").isEmpty()) {
+            log.warn("JSON 中未找到 choices 或 choices 为空");
+            return "";
+        }
+
+        JsonNode choices = root.get("choices");
+        JsonNode firstChoice = choices.get(0);
+
+        // 检查第一个 choice 是否存在
+        if (firstChoice == null) {
+            log.warn("choices[0] 不存在");
+            return "";
+        }
+
+        // 流式响应结构：choices[0].delta.content
+        JsonNode delta = firstChoice.get("delta");
+        if (delta != null) {
+            JsonNode contentNode = delta.get("content");
+            if (contentNode != null && !contentNode.isMissingNode() && contentNode.isValueNode()) {
+                return contentNode.asText();
+            }
+        }
+
+        // 非流式结构：choices[0].message.content
+        JsonNode message = firstChoice.get("message");
+        if (message != null) {
+            JsonNode contentNode = message.get("content");
+            if (contentNode != null && !contentNode.isMissingNode() && contentNode.isValueNode()) {
+                return contentNode.asText();
+            }
+        }
+
+        log.warn("未能从 JSON 中提取到 content 内容");
+        return "";
     }
 
 }

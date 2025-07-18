@@ -27,10 +27,13 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -82,74 +85,88 @@ public class IInterviewServiceImpl implements IInterviewService {
     @Resource
     private SimpMessagingTemplate messagingTemplate; // 2. 注入 SimpMessagingTemplate
 
-    //面试过程时的对话
+    /**
+     * 【核心重构】面试核心业务流程。
+     * 此方法现在只负责定义一个完整的、从“接收用户消息”到“返回AI回复流”的响应式工作流。
+     * 它不再直接执行任何操作，而是返回一个包含所有业务逻辑的 Flux，由调用者（AsrProcessingService）来订阅并触发执行。
+     *
+     * @param message   用户的完整回答文本。
+     * @param sessionId 当前会话ID。
+     * @param userId    用户ID。
+     * @return 一个包含AI流式回复的Flux<String>。
+     */
     @Override
     public Flux<String> interviewProcess(String message, String sessionId, Integer userId) {
-        // --- 步骤 A: 更新上一轮对话 (承上) ---
-        // 在调用AI之前，先用用户的回答 message 来完成上一轮对话
-        InterviewDialogue pendingDialogue = dialogueMapper.findLatestPendingDialogue(sessionId);
-
-        if (pendingDialogue != null) {
+        // 【步骤A - 承上】: 更新上一轮对话的用户回答。
+        // 使用 Mono.fromRunnable 将同步的数据库操作包装成一个响应式类型，并确保它在流的开始执行。
+        Mono<InterviewDialogue> updatePreviousTurnMono = Mono.fromCallable(() -> {
+            InterviewDialogue pendingDialogue = dialogueMapper.findLatestPendingDialogue(sessionId);
+            if (pendingDialogue == null) {
+                // 如果没有等待中的AI提问，这是一个严重的业务流程错误。
+                log.error("严重错误：在会话 {} 中收到用户消息，但没有找到待处理的AI提问！", sessionId);
+                throw new IllegalStateException("对话状态异常，无法处理您的消息。");
+            }
             pendingDialogue.setUserMessage(message);
-
             dialogueMapper.updateById(pendingDialogue);
             log.info("已更新面试会话 {} 的第 {} 轮对话，用户回答已存入。", sessionId, pendingDialogue.getSequence());
-        } else {
-            // 异常情况，意味着用户发来了消息，但系统中没有一个等待回答的AI提问
-            log.error("严重错误：在会话 {} 中收到用户消息，但没有找到待处理的AI提问！", sessionId);
-            return Flux.error(new IllegalStateException("对话状态异常，无法处理您的消息。"));
-        }
-        // todo: 1.在回答前，应该先根据用户选中的频道等相关信息 这里从数据库里面去拿出相关信息 而不是全靠向量数据库【这里先保障一下】
-        //       2.堆一下向量数据库
-        // --- 步骤 B: 请求AI生成新一轮问题 (启下) ---
-        // 1. 获取上下文信息 (这部分不变)
-        ResumeDataDto resume = resumeService.getResumeByUserId(userId);
-        Long resumeId = resumeService.getResumeIdByUserId(userId);
-        List<ResumeModule> resumeModules = resumeModuleService.getResumeModulesByResumId(resumeId);
-        InterviewSessions session = sessionsService.getById(sessionId);
-        ChannelDetailDTO channel = channelsService.getChannelDetailsNoAdd(session.getChannelId());
 
-        // 2. AI 处理（流式返回）
-        log.info("用户 (sessionId: {}) 发送消息: {}，正在请求AI生成下一轮问题...", sessionId, message);
-        Flux<String> aiResponseStream = interviewExpert.aiInterviewByStreamWithProcess(message, sessionId, resume, resumeModules, channel);
+            // 启动异步分析任务 (这个是旁路任务，不影响主流程)
+            performTurnAnalysisAsync(pendingDialogue);
 
-        // 3. 在流结束后，将AI的新问题作为新一轮对话插入数据库
-        final StringBuilder aiResponseCollector = new StringBuilder();
+            return pendingDialogue;
+        }).subscribeOn(Schedulers.boundedElastic()); // 【并发模型】将数据库操作切换到专用的工作线程池，避免阻塞调用者线程。
 
-        return aiResponseStream
-                .doOnNext(aiResponseCollector::append)
-                .doOnComplete(() -> {
-                    // 我们把刚刚填充好用户回答的 pendingDialogue 传进去进行分析
-                    performTurnAnalysisAsync(pendingDialogue);
-                    String fullAiResponse = aiResponseCollector.toString().trim();
-                    if (fullAiResponse.isEmpty()) {
-                        log.warn("AI为会话 {} 生成的响应为空，不创建新的对话轮次。", sessionId);
-                        return;
-                    }
+        // 【步骤B - 启下】: 请求AI生成新问题。
+        // 定义一个获取AI回复流的Mono。使用defer使其懒加载，只有在被订阅时才执行。
+        Mono<Flux<String>> getAiStreamMono = Mono.defer(() -> {
+            log.info("用户 (sessionId: {}) 发送消息: {}，准备请求AI生成下一轮问题...", sessionId, message);
+            // 获取上下文信息
+            ResumeDataDto resume = resumeService.getResumeByUserId(userId);
+            Long resumeId = resumeService.getResumeIdByUserId(userId);
+            List<ResumeModule> resumeModules = resumeModuleService.getResumeModulesByResumId(resumeId);
+            InterviewSessions session = sessionsService.getById(sessionId);
+            ChannelDetailDTO channel = channelsService.getChannelDetailsNoAdd(session.getChannelId());
 
-                    log.info("会话 {} 的新一轮AI提问已生成，准备存入数据库。问题: {}", sessionId, fullAiResponse);
-                    // 增加对用户回答的初步分析逻辑，并填充 turn_analysis
-                    // pendingDialogue.setTurnAnalysis(analyzeUserAnswer(message));
-                    // 获取当前最大序号
-                    Integer maxSequence = dialogueMapper.getMaxSequence(sessionId);
+            // 调用AI专家获取流
+            return Mono.just(interviewExpert.aiInterviewByStreamWithProcess(message, sessionId, resume, resumeModules, channel));
+        });
 
-                    // 创建代表新一轮提问的实体
-                    InterviewDialogue newDialogue = new InterviewDialogue();
-                    newDialogue.setSessionId(sessionId);
-                    newDialogue.setSequence(maxSequence == null ? 1 : maxSequence + 1); // 序号+1
-                    newDialogue.setAiMessage(fullAiResponse); // 这是AI的新提问
-                    newDialogue.setUserMessage(null); // 用户尚未回答，设为null
-                    newDialogue.setTimestamp(LocalDateTime.now());
-
-                    try {
-                        dialogueMapper.insert(newDialogue);
-                        log.info("成功为会话 {} 创建了第 {} 轮新对话。", sessionId, newDialogue.getSequence());
-                    } catch (Exception e) {
-                        log.error("为会话 {} 创建新对话失败！", sessionId, e);
-                    }
-                });
+        // 【关键修复】使用 .then() 和 .flatMapMany() 正确地将步骤A和步骤B串联起来。
+        // 1. 首先执行 updatePreviousTurnMono (更新上一轮)
+        // 2. .then(getAiStreamMono) 在上一步完成后，执行 getAiStreamMono (获取AI流)
+        // 3. .flatMapMany(flux -> flux) 将 Mono<Flux<String>> 扁平化为 Flux<String>
+        return updatePreviousTurnMono
+                .then(getAiStreamMono)
+                .flatMapMany(flux -> {
+                    // 【设计模式改进】将AI回复的存储逻辑也移到这里，在流结束时执行。
+                    StringBuilder aiResponseCollector = new StringBuilder();
+                    return flux
+                            .doOnNext(aiResponseCollector::append)
+                            .doOnComplete(() -> {
+                                String fullAiResponse = aiResponseCollector.toString().trim();
+                                if (fullAiResponse.isEmpty()) {
+                                    log.warn("AI为会话 {} 生成的响应为空，不创建新的对话轮次。", sessionId);
+                                    return;
+                                }
+                                // 创建并插入代表新一轮AI提问的记录
+                                Integer maxSequence = dialogueMapper.getMaxSequence(sessionId);
+                                InterviewDialogue newDialogue = new InterviewDialogue();
+                                newDialogue.setSessionId(sessionId);
+                                newDialogue.setSequence(maxSequence == null ? 1 : maxSequence + 1);
+                                newDialogue.setAiMessage(fullAiResponse);
+                                newDialogue.setUserMessage(null);
+                                newDialogue.setTimestamp(LocalDateTime.now());
+                                try {
+                                    dialogueMapper.insert(newDialogue);
+                                    log.info("成功为会话 {} 创建了第 {} 轮新对话。", sessionId, newDialogue.getSequence());
+                                } catch (Exception e) {
+                                    log.error("为会话 {} 创建新对话失败！", sessionId, e);
+                                }
+                            });
+                })
+                // 【并发模型】同样，将整个AI请求和后续数据库操作都放在工作线程池上执行
+                .subscribeOn(Schedulers.boundedElastic());
     }
-
     /**
      * 异步执行对单轮对话的AI分析，并将结果更新回数据库。
      * 使用 CompletableFuture.runAsync() 确保此操作在后台线程池中运行，不会阻塞主流程。
@@ -355,6 +372,7 @@ public class IInterviewServiceImpl implements IInterviewService {
 
 
     @Override
+    @Async("taskExecutor")
     public void end(Integer userId, String sessionId) {
         //结束面试时需要做的
         InterviewSessions interviewSessionsOld = sessionsMapper.selectById(sessionId);

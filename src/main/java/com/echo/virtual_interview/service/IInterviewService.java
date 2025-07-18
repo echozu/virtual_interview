@@ -5,7 +5,7 @@ import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPaylo
 import reactor.core.publisher.Flux;
 
 public interface IInterviewService {
-    Flux<String> interviewProcess(String message, String chatId, Integer userId);
+    Flux<String> interviewProcess(String message, String sessionId, Integer userId);
 
     void end(Integer userId,String sessionId);
 

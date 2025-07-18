@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  * </p>
  *
  * @author echo
- * @since 2025-06-20
+ * @since 2025-07-18
  */
 public interface LearningResourcesMapper extends BaseMapper<LearningResources> {
 

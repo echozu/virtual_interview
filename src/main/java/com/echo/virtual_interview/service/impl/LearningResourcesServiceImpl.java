@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
  * </p>
  *
  * @author echo
- * @since 2025-06-20
+ * @since 2025-07-18
  */
 @Service
 public class LearningResourcesServiceImpl extends ServiceImpl<LearningResourcesMapper, LearningResources> implements ILearningResourcesService {

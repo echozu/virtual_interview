@@ -118,7 +118,7 @@ public class InterviewExpert {
      * 面试过程：进行面试对话时的交流。
      *
      * @param message       用户的最新消息。
-     * @param chatId        会话记忆的唯一 ID。
+     * @param sessionId        会话记忆的唯一 ID。
      * @param resume        候选人的简历数据。
      * @param resumeModules 简历的结构化模块。
      * @param channel       当前面试的配置。
@@ -126,7 +126,7 @@ public class InterviewExpert {
      */
     public Flux<String> aiInterviewByStreamWithProcess(
             String message,
-            String chatId,
+            String sessionId,
             ResumeDataDto resume,
             List<ResumeModule> resumeModules,
             ChannelDetailDTO channel) {
@@ -136,7 +136,7 @@ public class InterviewExpert {
         String formattedResume = adapter.formatResumeToMarkdown(resume, resumeModules);
         String formattedChannel = adapter.formatChannelToMarkdown(channel);
 
-        // ✅ --- V3: 最终、更健壮的系统提示（已调整为适合流式输出）---
+        //  --- V3: 最终、更健壮的系统提示（已调整为适合流式输出）---
         String systemContent = """
                 # 任务说明
                 你是一位世界级的 AI 技术面试官。你的主要目标是进行高度真实、深入且公平的技术面试，以全面评估候选人的技能和经验。
@@ -189,13 +189,11 @@ public class InterviewExpert {
                 .advisors(spec -> spec
                         .advisors(
                                 // 开启mysql
-                                new MessageChatMemoryAdvisor(mysqlInterviewMemory),
-                                ragCloudAdvisor  // 知识库顾问
+                                new MessageChatMemoryAdvisor(mysqlInterviewMemory)
+//                                ragCloudAdvisor  // 知识库顾问
                         )
-                        .params(Map.of(
-                                "chat_memory.conversation_id", chatId,
-                                "chat_memory.retrieve_size", 10
-                        ))
+                        .param(CHAT_MEMORY_CONVERSATION_ID_KEY, sessionId)
+                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10)
                 )
                 .stream()
                 .content();
@@ -245,6 +243,20 @@ public class InterviewExpert {
                 .user(analysisPrompt)
                 .call()
                 .entity(TurnAnalysisResponse.class);
+    }
+
+    public String aiInterviewByAnalysis(String aiPrompt, String aiMessage) {
+        return this.chatClient
+                .prompt(aiPrompt)
+                .user(aiMessage)
+                .call().content();
+    }
+
+    public String aiInterviewByrecommendations(String prompt, String message) {
+        return this.chatClient
+                .prompt(prompt)
+                .user(message)
+                .call().content();
     }
 
     /**

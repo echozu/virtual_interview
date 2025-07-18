@@ -3,6 +3,7 @@ package com.echo.virtual_interview.model.entity;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import java.time.LocalDateTime;
 import java.io.Serializable;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,35 +14,39 @@ import lombok.experimental.Accessors;
 
 /**
  * <p>
- * 连接分析报告和推荐的学习资源（单场面试推荐）
+ * 存储每次面试后的个性化学习推荐
  * </p>
  *
  * @author echo
- * @since 2025-06-20
+ * @since 2025-07-18
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("report_resource_recommendations")
-@Schema(name="ReportResourceRecommendations对象", description="连接分析报告和推荐的学习资源（单场面试推荐）")
-public class ReportResourceRecommendations implements Serializable {
+@TableName("interview_learning_recommendations")
+@Schema(name="InterviewLearningRecommendations对象", description="存储每次面试后的个性化学习推荐")
+public class InterviewLearningRecommendations implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    @SchemaProperty(name = "推荐记录唯一ID")
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @SchemaProperty(name = "分析报告ID")
-    private Long reportId;
+    @SchemaProperty(name = "关联的面试会话ID")
+    private String sessionId;
 
     @SchemaProperty(name = "推荐的学习资源ID")
     private Long resourceId;
 
-    @SchemaProperty(name = "推荐原因（如：针对STAR法则薄弱）")
+    @SchemaProperty(name = "推荐理由 (由AI生成，解释为何推荐此资源)")
     private String recommendationReason;
 
-    @SchemaProperty(name = "学习路径中的步骤编号,用于前端利用x轴展示递进关系")
+    @SchemaProperty(name = "推荐学习步骤/优先级")
     private Integer stepNumber;
+
+    @SchemaProperty(name = "创建时间")
+    private LocalDateTime createdAt;
 
 
 }

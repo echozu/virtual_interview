@@ -37,6 +37,4 @@ import java.util.Optional;
 @Slf4j
 public class InterviewSessionsServiceImpl extends ServiceImpl<InterviewSessionsMapper, InterviewSessions>
         implements IInterviewSessionsService {
-
-
 }

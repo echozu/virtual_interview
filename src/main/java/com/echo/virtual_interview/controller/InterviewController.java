@@ -4,8 +4,10 @@ import com.echo.virtual_interview.common.BaseResponse;
 import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.common.ResultUtils;
 import com.echo.virtual_interview.context.UserIdContext;
+import com.echo.virtual_interview.model.dto.analysis.InterviewReportResponseDTO;
 import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
 import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPayload;
+import com.echo.virtual_interview.service.IAnalysisReportsService;
 import com.echo.virtual_interview.service.IInterviewService;
 import com.echo.virtual_interview.service.IInterviewSessionsService;
 import com.echo.virtual_interview.service.impl.AnalysisStatusService;
@@ -13,6 +15,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -27,6 +30,8 @@ public class InterviewController {
     private AnalysisStatusService analysisStatusService;
     @Resource
     private IInterviewService interviewService;
+    @Resource
+    private IAnalysisReportsService analysisReportsService;
 
     /**
      * 开启面试
@@ -45,14 +50,12 @@ public class InterviewController {
      * 触发“面试开始”流程。
      * 此接口会立即返回，并在后台异步生成开场白语音，通过WebSocket推送给用户。
      * @param sessionId 面试会话ID
-     * @param userId 用户ID
      * @return 返回一个表示任务已成功启动的响应
      */
     @GetMapping("/process/start/greeting-audio")
     public BaseResponse<String> triggerGreetingAudio(
-            @RequestParam String sessionId,
-            @RequestParam Integer userId) { // 1. 新增userId参数
-
+            @RequestParam String sessionId) {
+        Integer userId = UserIdContext.getUserIdContext();
         // 2. 调用ai回复的逻辑
         interviewService.generateAndSendGreetingAudio(sessionId, userId);
 
@@ -100,7 +103,7 @@ public class InterviewController {
     }
 
     /**
-     * 结束面试
+     * 结束面试-异步
      * 1.当前端用户点击结束面试时，前端/安卓端自己控制去断开ws连接，释放资源： stompClient.deactivate(); // 或者 stompClient.disconnect()
      * 2.其他的逻辑在后台操作
      * @return
@@ -111,6 +114,17 @@ public class InterviewController {
 
         interviewService.end(userId,sessionId);
         return ResultUtils.success("结束面试成功");
+    }
+
+    /**
+     * 获取指定面试会话的完整分析报告-有缓存
+     * @param sessionId 面试会话的唯一ID
+     * @return 包含所有分析数据的JSON响应
+     */
+    @GetMapping("/analysis/{sessionId}")
+    public BaseResponse<InterviewReportResponseDTO> getReport(@PathVariable String sessionId) {
+        InterviewReportResponseDTO report = analysisReportsService.getFullReportBySessionId(sessionId);
+        return ResultUtils.success(report);
     }
 
 /*    *//**

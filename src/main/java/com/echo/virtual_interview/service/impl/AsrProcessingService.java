@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -243,17 +245,16 @@ public class AsrProcessingService {
                 log.info("ASR连接关闭，开始处理会话 {} 的完整转写结果。", sessionId);
                 StringBuilder finalTranscriptBuilder = transcriptBuffers.get(sessionId);
                 String fullText = (finalTranscriptBuilder != null) ? finalTranscriptBuilder.toString().trim() : "";
-//                fullText = "你好，我是echo"; // todo:测试
+
                 if (StringUtils.hasText(fullText)) {
-                    // 3. 将完整的识别文本交给新的流式AI->TTS处理方法
-                    handleStreamingAiResponse(fullText, sessionId, userId);
+                    // 【关键修复】调用重构后的、完全响应式的处理方法
+                    handleStreamingAiResponse_Reactive(fullText, sessionId, userId);
                 } else {
                     log.warn("[业务流] 会话: {} 的最终转写文本为空，不调用AI服务。", sessionId);
                     // 即使不调用AI，也要清理ASR相关的资源
                     cleanupSessionResources(sessionId);
                 }
             };
-
             // 创建并连接ASR客户端...
             IflytekAsrClient client = new IflytekAsrClient(new URI(url), draft, onMessageCallback, onCloseCallback);
             client.setConnectionLostTimeout(60);
@@ -322,12 +323,12 @@ public class AsrProcessingService {
         // 调用AI服务，并订阅其返回的流式文本
         interviewService.interviewProcess(fullText, sessionId, userId)
                 .doOnNext(aiReplyChunk -> {
-                    // 1. 【新增逻辑】将AI返回的文本块，实时发送给前端
+                    // 1.将AI返回的文本块，实时发送给前端
                     if (StringUtils.hasText(aiReplyChunk)) {
                         messagingTemplate.convertAndSendToUser(
                                 userId.toString(),
                                 DEST_AI_TRANSCRIPT,
-                                new ChatMessage("assistant", aiReplyChunk) // 使用您已有的ChatMessage DTO
+                                new ChatMessage("assistant", aiReplyChunk)
                         );
                     }
 
@@ -546,5 +547,95 @@ public class AsrProcessingService {
         audioQueues.clear();
         sendingTasks.clear();
         log.info("AsrProcessingService已成功关闭。");
+    }
+    /**
+     * 【核心重构】使用纯响应式方法处理从AI到TTS的完整流程。
+     * 此方法定义了一个完整的、非阻塞的数据管道。
+     */
+    private void handleStreamingAiResponse_Reactive(String fullText, String sessionId, Integer userId) {
+        log.info("[业务流] 会话: {}, 用户: {}. 完整识别文本: '{}' -> 即将流式请求AI并转为语音", sessionId, userId, fullText);
+
+        interviewService.interviewProcess(fullText, sessionId, userId)
+                // 1. 将AI的流式文本块实时推给前端（用于界面展示）
+                .doOnNext(aiChunk -> {
+                    if (StringUtils.hasText(aiChunk)) {
+                        messagingTemplate.convertAndSendToUser(userId.toString(), DEST_AI_TRANSCRIPT, new ChatMessage("assistant", aiChunk));
+                    }
+                })
+                // 2. 将所有文本块收集成一个完整的字符串
+                .collectList()
+                .map(chunks -> String.join("", chunks).trim())
+                // 3. 【关键修复】使用 flatMap 将一个Mono<String>转换成一个Flux<AudioResponseDto>
+                .flatMapMany(fullAiResponse -> {
+                    if (fullAiResponse.isEmpty()) {
+                        log.warn("AI最终响应为空，不进行TTS合成。SessionID: {}", sessionId);
+                        return Flux.empty(); // 如果AI没回复，返回一个空流
+                    }
+
+                    log.info("AI完整回复: '{}', 准备进行分句TTS。", fullAiResponse);
+
+                    // 4. 将完整回复按标点切分成句子
+                    String[] sentences = fullAiResponse.split("(?<=[" + SENTENCE_DELIMITERS + "])");
+
+                    // 5. 【设计模式改进】使用 Flux.fromArray 和 concatMap 实现TTS的顺序播放
+                    // concatMap会保证前一个句子的TTS音频流完全结束后，才开始下一个句子的TTS，确保语音不会重叠。
+                    return Flux.fromArray(sentences)
+                            .map(String::trim)
+                            .filter(StringUtils::hasText)
+                            .concatMap(this::reactiveSynthesizeSentence); // 将每个句子响应式地合成为音频流
+                })
+                // 6. 在所有音频流结束后，追加一个最终的结束信号
+                .concatWith(Mono.fromCallable(() -> {
+                    log.info("所有TTS任务完成，向用户 {} 发送结束信号。", userId);
+                    return new AudioResponseDto(null, true);
+                }))
+                // 7. 将最终的音频DTO（无论是数据还是结束信号）发送给前端
+                .doOnNext(audioDto -> messagingTemplate.convertAndSendToUser(userId.toString(), "/queue/interview/audio.reply", audioDto))
+                // 8. 错误处理
+                .doOnError(error -> log.error("处理AI->TTS流时发生严重错误。SessionID: {}", sessionId, error))
+                // 9. 【关键修复】资源清理。在整个流（包括所有TTS）成功或失败结束后才执行。
+                .doFinally(signalType -> cleanupSessionResources(sessionId))
+                // 10. 【并发模型】订阅并触发整个流程的执行。
+                .subscribe();
+    }
+
+
+    /**
+     * 【新增辅助方法】将基于回调的TtsService封装成响应式的Flux。
+     * 这是连接异步回调和响应式流的标准桥梁模式。
+     *
+     * @param sentence 要合成的句子
+     * @return 返回一个包含该句子所有音频数据块（Base64）的Flux。
+     */
+    private Flux<AudioResponseDto> reactiveSynthesizeSentence(String sentence) {
+        return Flux.create(sink -> {
+            log.info("开始响应式TTS合成: '{}'", sentence);
+
+            // 定义回调
+            Consumer<String> onAudioReceived = audioBase64 -> {
+                // 每收到一个音频块，就通过sink推送到流中
+                sink.next(new AudioResponseDto(audioBase64, false));
+            };
+
+            Runnable onComplete = () -> {
+                log.info("句子 '{}' 合成完毕。", sentence);
+                // TTS合成结束，通知流完成
+                sink.complete();
+            };
+
+            Consumer<String> onError = errorMsg -> {
+                log.error("句子 '{}' 合成失败: {}", sentence, errorMsg);
+                // TTS出错，通知流错误
+                sink.error(new RuntimeException("TTS synthesis failed: " + errorMsg));
+            };
+
+            // 调用旧的、基于回调的TTS服务
+            try {
+                ttsService.synthesize(sentence, onAudioReceived, onComplete, onError);
+            } catch (Exception e) {
+                // 捕获立即发生的异常
+                sink.error(e);
+            }
+        });
     }
 }

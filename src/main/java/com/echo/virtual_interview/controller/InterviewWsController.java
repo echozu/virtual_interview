@@ -5,7 +5,6 @@ import com.echo.virtual_interview.controller.ai.InterviewExpert;
 import com.echo.virtual_interview.model.dto.interview.audio.AudioChunkDto;
 import com.echo.virtual_interview.model.dto.interview.ChatMessage;
 import com.echo.virtual_interview.service.IInterviewService;
-import com.echo.virtual_interview.service.IInterviewSessionsService;
 import com.echo.virtual_interview.service.impl.AsrProcessingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
