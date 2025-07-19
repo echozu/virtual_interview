@@ -65,9 +65,17 @@ public class ExperiencePostController {
         ExperiencePostDetailResponse detail = experiencePostService.getExperiencePostDetail(postId);
         return ResultUtils.success(detail);
     }
-
     /**
-     * 4.分页获取面经列表
+     * 4.获取面经广场首页的排行榜数据
+     * @return 包含多个排行榜的聚合数据
+     */
+    @GetMapping("/get/Header")
+    public BaseResponse<LeaderboardResponse> getLeaderboards() {
+        LeaderboardResponse leaderboards = experiencePostService.getLeaderboards();
+        return ResultUtils.success(leaderboards);
+    }
+    /**
+     * 5.分页获取面经列表
      * @param queryRequest 包含分页、排序和筛选条件的请求体
      * @return 分页的面经列表视图
      */

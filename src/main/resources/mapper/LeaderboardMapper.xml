@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echo.virtual_interview.mapper.LeaderboardMapper">
+
+    <!-- 查询本周点赞数最多的面经帖子 -->
+    <select id="findTopLikedPostsInPeriod" resultType="map">
+        SELECT p.id             AS postId,
+               p.title,
+               p.experience_url as experienceUrl,
+               p.tags
+        FROM experience_posts p
+                 JOIN
+             experience_interactions i ON p.id = i.post_id
+        WHERE p.status = 'PUBLISHED'
+          AND p.visibility = 'PUBLIC'
+          AND i.interaction_type = 'LIKE'
+          AND i.created_at >= #{startTime}
+        GROUP BY p.id, p.title, p.experience_url,
+                 p.tags -- GROUP BY中也加入新查询的字段
+        ORDER BY COUNT(i.id) DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 查询本月获赞最多的用户 -->
+    <select id="findTopLikedAuthorsInPeriod" resultType="com.echo.virtual_interview.model.dto.experience.TopAuthorDTO">
+        SELECT
+            u.id AS userId,
+            u.nickname,
+            u.avatar_url AS avatarUrl,
+            COUNT(i.id) AS totalLikes
+        FROM
+            users u
+                JOIN
+            experience_posts p ON u.id = p.user_id
+                JOIN
+            experience_interactions i ON p.id = i.post_id
+        WHERE
+            i.interaction_type = 'LIKE'
+          AND i.created_at >= #{startTime}
+        GROUP BY
+            u.id, u.nickname, u.avatar_url
+        ORDER BY
+            totalLikes DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

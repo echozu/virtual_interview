@@ -50,4 +50,9 @@ public interface IExperiencePostsService extends IService<ExperiencePosts> {
     List<InterviewHistoryDTO> getHistoryWithExperience(Integer userId);
 
     List<ShareableElementDTO> getShareableElements();
+    /**
+     * 获取所有排行榜数据
+     * @return 包含多个排行榜列表的响应对象
+     */
+    LeaderboardResponse getLeaderboards();
 }

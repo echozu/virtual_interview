@@ -28,6 +28,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.time.DayOfWeek;
+import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -86,7 +89,7 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
         BeanUtils.copyProperties(createRequest, post);
         post.setUserId(Long.valueOf(userId)); // 设置作者ID
         // 设置初始状态，建议使用枚举
-        post.setStatus(createRequest.getVisibility());
+        post.setStatus("PUBLISHED");
 
         // 步骤 3: 处理标签列表 -> 转换为JSON字符串
         List<String> tagsList = createRequest.getTags();
@@ -213,7 +216,7 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
 
         // 步骤 1: 获取面经主帖信息
         ExperiencePosts post = experiencePostMapper.selectById(postId);
-        if (post == null || !"PUBLIC".equals(post.getStatus())) {
+        if (post == null || !"PUBLISHED".equals(post.getStatus())) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "面经不存在或未发布");
         }
 
@@ -324,7 +327,92 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
         return fullReport;
     }
 
+    @Resource
+    private LeaderboardMapper leaderboardMapper;
 
+    private static final int LEADERBOARD_LIMIT = 4; // 排行榜显示数量
+
+    @Override
+    public LeaderboardResponse getLeaderboards() {
+        // 1. 获取本周热门帖子的原始数据
+        LocalDateTime startOfWeek = LocalDateTime.now().with(DayOfWeek.MONDAY).toLocalDate().atStartOfDay();
+        List<Map<String, Object>> rawWeeklyHotPosts = leaderboardMapper.findTopLikedPostsInPeriod(startOfWeek, LEADERBOARD_LIMIT);
+
+        // 手动将 List<Map> 转换为 List<HotPostDTO>，并处理tags字段
+        List<HotPostDTO> weeklyHotPosts = rawWeeklyHotPosts.stream().map(rawPost -> {
+            HotPostDTO dto = new HotPostDTO();
+            // 注意：从Map中取值时，MyBatis可能会根据数据库驱动返回Long或BigInteger，强转为Number再取longValue更安全
+            dto.setPostId(((Number) rawPost.get("postId")).longValue());
+            dto.setTitle((String) rawPost.get("title"));
+            dto.setExperienceUrl((String) rawPost.get("experienceUrl"));
+
+            String tagsJson = (String) rawPost.get("tags");
+            if (StringUtils.isNotBlank(tagsJson)) {
+                try {
+                    dto.setTags(objectMapper.readValue(tagsJson, new TypeReference<List<String>>() {}));
+                } catch (JsonProcessingException e) {
+                    log.warn("解析周热门榜帖子标签失败, postId: {}, tags: {}", dto.getPostId(), tagsJson, e);
+                    dto.setTags(Collections.emptyList());
+                }
+            } else {
+                dto.setTags(Collections.emptyList());
+            }
+            return dto;
+        }).collect(Collectors.toList());
+
+        // 2. 获取本月获赞最多的4位用户
+        LocalDateTime startOfMonth = LocalDateTime.now().with(TemporalAdjusters.firstDayOfMonth()).toLocalDate().atStartOfDay();
+        List<TopAuthorDTO> monthlyTopAuthors = leaderboardMapper.findTopLikedAuthorsInPeriod(startOfMonth, LEADERBOARD_LIMIT);
+
+        // 3. 获取评论最多的4篇面经
+        QueryWrapper<ExperiencePosts> queryWrapper = new QueryWrapper<>();
+        // 在查询中加入 experience_url 和 tags 字段
+        queryWrapper.select("id", "title", "experience_url", "tags")
+                .eq("status", "PUBLISHED")
+                .eq("visibility", "PUBLIC")
+                .orderByDesc("comments_count")
+                .last("LIMIT " + LEADERBOARD_LIMIT);
+
+        List<ExperiencePosts> topCommentedPosts = experiencePostMapper.selectList(queryWrapper);
+
+        // 使用 .stream().map() 进行转换
+        List<HotPostDTO> mostCommentedPosts = topCommentedPosts.stream()
+                .map(post -> {
+                    HotPostDTO dto = new HotPostDTO();
+                    dto.setPostId(post.getId());
+                    dto.setTitle(post.getTitle());
+                    // 直接设置 experienceUrl
+                    dto.setExperienceUrl(post.getExperienceUrl());
+
+                    // ==================== 核心修改开始 ====================
+                    // 处理 tags 字段，从JSON字符串转换为List<String>
+                    if (StringUtils.isNotBlank(post.getTags())) {
+                        try {
+                            // 使用 ObjectMapper 将JSON数组字符串反序列化为List
+                            List<String> tagList = objectMapper.readValue(post.getTags(), new TypeReference<List<String>>() {});
+                            dto.setTags(tagList);
+                        } catch (JsonProcessingException e) {
+                            // 如果解析失败，打印警告日志，并设置一个空列表以避免前端出错
+                            log.warn("解析面经标签失败, postId: {}, tags: {}", post.getId(), post.getTags(), e);
+                            dto.setTags(Collections.emptyList());
+                        }
+                    } else {
+                        // 如果tags字段本身为空，也设置一个空列表
+                        dto.setTags(Collections.emptyList());
+                    }
+                    // ==================== 核心修改结束 ====================
+
+                    return dto;
+                }).collect(Collectors.toList());
+
+
+        // 4. 组装响应对象
+        return LeaderboardResponse.builder()
+                .weeklyHotPosts(weeklyHotPosts)
+                .monthlyTopAuthors(monthlyTopAuthors)
+                .mostCommentedPosts(mostCommentedPosts)
+                .build();
+    }
     @Override
     public Page<ExperiencePostVO> listExperiencePostsByPage(ExperiencePostQueryRequest queryRequest) {
         Page<ExperiencePostVO> page = new Page<>(queryRequest.getCurrent(), queryRequest.getPageSize());
