@@ -2,56 +2,73 @@ package com.echo.virtual_interview.model.dto.experience;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
-import java.io.Serializable;
-import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 
 /**
- * 面经列表的视图对象 (View Object)
+ * 面经帖子卡片视图对象
  */
 @Data
-public class ExperiencePostVO implements Serializable {
-
-    private static final long serialVersionUID = 1L;
-
-    private Long id;
-    private String title;
-
-    // 作者信息
-    private Integer authorId;
+public class ExperiencePostVO {
+    
+    /**
+     * 帖子ID
+     */
+    private Long postId;
+    
+    /**
+     * 作者昵称
+     */
     private String authorNickname;
-    private String authorAvatar;
 
-    // 摘要信息
-    private String summary; // 内容摘要，截取前100个字符
-    private List<String> tags; // 标签
-
-    // 统计数据
-    private Integer viewsCount;
+    /**
+     * 标题
+     */
+    private String title;
+    
+    /**
+     * 标签列表 (将在Java代码中转换)
+     */
+    private List<String> tags;
+    
+    /**
+     * 点赞数
+     */
     private Integer likesCount;
+    
+    /**
+     * 评论数
+     */
     private Integer commentsCount;
-
-    private LocalDateTime createdAt;
+    
+    /**
+     * 应聘岗位
+     */
+    private String position;
+    /**
+     * 封面链接
+     */
+    private String experienceUrl;
+    /**
+     * 公司
+     */
+    private String company;
+    
+    /**
+     * 工作类型
+     */
+    private String jobType;
 
     /**
-     * 这个字段仅用于接收MyBatis从数据库返回的GROUP_CONCAT字符串
-     * 它不是给前端的。
+     * 是否匿名 (用于前端判断是否显示作者详情链接)
      */
-    @JsonIgnore // 确保这个字段不会被序列化到前端
-    private String tagsString;
-
+    private Boolean isAnonymous;
+    
     /**
-     * 重写getter方法，在获取tags时，如果tags为空，则根据tagsString进行转换
-     *
-     * @return 标签列表
+     * 标签的JSON字符串 (从DB查询出的原始值，用于在Java中后处理)
+     * 这个字段不返回给前端
      */
-    public List<String> getTags() {
-        if (this.tags == null && this.tagsString != null && !this.tagsString.isEmpty()) {
-            this.tags = Arrays.asList(this.tagsString.split(","));
-        }
-        return this.tags;
-        // 可以添加AI报告中的雷达图数据等关键信息
-        // private Object radarChartData;
-    }
+    @JsonIgnore
+    private String tagsJson;
+
+
 }

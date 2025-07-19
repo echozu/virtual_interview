@@ -1,16 +1,13 @@
 package com.echo.virtual_interview.model.dto.experience;
 
 import lombok.Data;
-import java.io.Serializable;
+import java.util.List;
 
 /**
- * 查询面经列表的请求体 (Query DTO)
- * 封装了分页、排序、筛选等所有查询参数
+ * 面经帖子分页查询请求体
  */
 @Data
-public class ExperiencePostQueryRequest implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class ExperiencePostQueryRequest {
 
     /**
      * 当前页码
@@ -18,47 +15,40 @@ public class ExperiencePostQueryRequest implements Serializable {
     private long current = 1;
 
     /**
-     * 每页显示条数
+     * 每页数量
      */
     private long pageSize = 10;
 
-
     /**
-     * 排序方式
-     * 可选值: "latest" (最新发布), "mostCollected" (最多收藏), "hot" (综合热度)
+     * 搜索关键词 (用于模糊查询标题和内容)
      */
-    private String sortBy = "hot"; // Default sorting by hotness
-
-    // --- Filtering Parameters ---
+    private String searchText;
 
     /**
-     * 全文搜索关键字 (将匹配标题)
+     * 排序字段。
+     * 可选值: "hot" (综合热度-默认), "latest" (最新发布), "mostCollected" (最多收藏)
      */
-    private String searchKey;
-
+    private String sortField;
+    
     /**
-     * 根据标签ID进行筛选
+     * 需要筛选的标签列表 (AND关系，即需要同时包含所有标签)
      */
-    private Long tagId;
+    private List<String> tags;
+
+    // --- 新增筛选字段 ---
 
     /**
-     * 根据公司名称进行筛选
+     * 公司名称 (模糊匹配)
      */
     private String company;
 
     /**
-     * 根据应聘岗位进行筛选
-     */
-    private String position;
-    
-    /**
-     * 根据工作类型进行筛选 (e.g., "校招", "社招")
+     * 工作类型 (精确匹配, 如 '校招', '社招')
      */
     private String jobType;
 
     /**
-     * 根据专业方向进行筛选
+     * 应聘岗位 (模糊匹配, 如 '后端', '产品')
      */
-    private String major;
-
+    private String position;
 }

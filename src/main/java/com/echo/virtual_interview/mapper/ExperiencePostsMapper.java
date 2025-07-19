@@ -1,5 +1,6 @@
 package com.echo.virtual_interview.mapper;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.echo.virtual_interview.model.dto.experience.ExperiencePostQueryRequest;
 import com.echo.virtual_interview.model.dto.experience.ExperiencePostVO;
 import com.echo.virtual_interview.model.entity.ExperiencePosts;
@@ -17,12 +18,11 @@ import org.apache.ibatis.annotations.Param;
  * @since 2025-07-18
  */
 public interface ExperiencePostsMapper extends BaseMapper<ExperiencePosts> {
-    /**
-     * 分页查询面经列表
+      /**
+     * 自定义分页查询，关联多表获取面经VO列表
      * @param page 分页对象
-     * @param queryParam 查询参数，例如：tagId, company, position等
-     * @return
+     * @param query 查询条件
+     * @return 分页的VO结果
      */
-    Page<ExperiencePostVO> listExperiencePostVO(Page<ExperiencePostVO> page, @Param("query") ExperiencePostQueryRequest queryParam);
-
+    IPage<ExperiencePostVO> selectPostVOPage(Page<?> page, @Param("query") ExperiencePostQueryRequest query);
 }

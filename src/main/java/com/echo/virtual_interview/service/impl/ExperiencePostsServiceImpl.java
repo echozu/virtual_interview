@@ -2,6 +2,7 @@ package com.echo.virtual_interview.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.echo.virtual_interview.common.ErrorCode;
@@ -414,31 +415,85 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
                 .build();
     }
     @Override
+    @SneakyThrows // 简化JsonProcessingException的书写
     public Page<ExperiencePostVO> listExperiencePostsByPage(ExperiencePostQueryRequest queryRequest) {
+        // 1. 创建MyBatis-Plus分页对象
         Page<ExperiencePostVO> page = new Page<>(queryRequest.getCurrent(), queryRequest.getPageSize());
-        // 调用Mapper中的自定义XML查询
-        return this.baseMapper.listExperiencePostVO(page, queryRequest);
-    }
 
-    @Override
-    @Transactional
-    public void deleteExperiencePost(Long postId) {
-        Integer userId = UserIdContext.getUserIdContext();
-        ExperiencePosts post = this.getById(postId);
+        // 2. 调用Mapper的自定义方法执行查询
+        // MyBatis-Plus分页插件会自动拦截这个方法，并执行分页
+        IPage<ExperiencePostVO> voPage = baseMapper.selectPostVOPage(page, queryRequest);
 
-        // 权限校验：只有作者本人或管理员可以删除
-        if (post == null || !Objects.equals(post.getUserId(), userId) /* && !isAdmin(userId) */) {
-            throw new BusinessException(500,"无权删除该面经");
+        // 3. 对查询结果进行后处理 (主要是转换tags)
+        List<ExperiencePostVO> records = voPage.getRecords();
+        for (ExperiencePostVO vo : records) {
+            // 如果是匿名，将昵称设为"匿名用户"
+            if (vo.getIsAnonymous()) {
+                vo.setAuthorNickname("匿名用户");
+            }
+
+            // 将tags的JSON字符串转换为List<String>
+            if (StringUtils.isNotBlank(vo.getTagsJson())) {
+                vo.setTags(objectMapper.readValue(vo.getTagsJson(), new TypeReference<>() {}));
+            } else {
+                vo.setTags(Collections.emptyList());
+            }
         }
 
-        // 1. 删除主表记录
+        // 4. 类型转换后返回 (IPage就是Page)
+        return (Page<ExperiencePostVO>) voPage;
+    }
+
+    @Resource
+    private ExperienceCommentsMapper experienceCommentMapper;
+
+    @Resource
+    private ExperienceInteractionsMapper experienceInteractionMapper;
+    @Override
+    @Transactional // @Transactional 注解确保所有删除操作要么全部成功，要么全部失败回滚
+    public void deleteExperiencePost(Long postId) {
+        // 1. 获取当前登录用户ID
+        Integer userId = UserIdContext.getUserIdContext();
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+
+        // 2. 查询待删除的面经
+        ExperiencePosts post = this.getById(postId);
+        if (post == null) {
+            // 如果帖子不存在，可以直接返回或抛出异常，这里选择不抛异常，操作幂等
+            log.warn("尝试删除不存在的面经，postId: {}", postId);
+            return;
+        }
+
+        // 3. 权限校验：只有作者本人或管理员可以删除
+        // TODO: 未来可以实现一个 isAdmin(userId) 的方法来判断管理员权限
+        if (!Objects.equals(post.getUserId(), Long.valueOf(userId)) /* && !isAdmin(userId) */) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权删除该面经");
+        }
+
+        // 4. 删除主表记录
         boolean removed = this.removeById(postId);
         if (removed) {
             log.info("用户 {} 删除了面经，ID: {}", userId, postId);
-            // 2. TODO: 手动级联删除
-            //    - 删除 experience_post_tags 表中所有 post_id 为 postId 的记录
-            //    - 删除 experience_comments 表中所有 post_id 为 postId 的记录
-            //    - 删除 experience_interactions 表中所有 post_id 为 postId 的记录
+
+            // 5. 手动级联删除关联数据
+            // 5.1 删除该面经下的所有评论
+            int deletedComments = experienceCommentMapper.delete(new QueryWrapper<ExperienceComments>().eq("post_id", postId));
+            if (deletedComments > 0) {
+                log.info("级联删除了 {} 条评论，postId: {}", deletedComments, postId);
+            }
+
+            // 5.2 删除该面经下的所有互动记录（点赞、收藏）
+            int deletedInteractions = experienceInteractionMapper.delete(new QueryWrapper<ExperienceInteractions>().eq("post_id", postId));
+            if (deletedInteractions > 0) {
+                log.info("级联删除了 {} 条互动记录，postId: {}", deletedInteractions, postId);
+            }
+
+        } else {
+            // 正常情况下，如果权限校验通过，这里不应该执行到。但为了健壮性，加上日志。
+            log.error("删除面经主表记录失败，postId: {}", postId);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "删除失败，请稍后重试");
         }
     }
 
