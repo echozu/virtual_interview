@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.echo.virtual_interview.mapper.ExperiencePostsMapper">
+    <resultMap id="ExperiencePostVOResultMap" type="com.echo.virtual_interview.model.dto.experience.ExperiencePostVO">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="authorId" column="authorId"/>
+        <result property="authorNickname" column="authorNickname"/>
+        <result property="authorAvatar" column="authorAvatar"/>
+        <result property="summary" column="summary"/>
+        <result property="viewsCount" column="views_count"/>
+        <result property="likesCount" column="likes_count"/>
+        <result property="commentsCount" column="comments_count"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="tagsString" column="tags"/>
+    </resultMap>
+    <select id="listExperiencePostVO"
+            resultType="com.echo.virtual_interview.model.dto.experience.ExperiencePostVO">
+        SELECT
+        p.id,
+        p.title,
+        p.views_count,
+        p.likes_count,
+        p.comments_count,
+        p.created_at,
+        SUBSTRING(p.content, 1, 100) AS summary,
+        u.id AS authorId,
+        -- 如果帖子是匿名的，则返回'匿名用户'
+        IF(p.is_anonymous = 1, '匿名用户', u.nickname) AS authorNickname,
+        IF(p.is_anonymous = 1, NULL, u.avatar_url) AS authorAvatar,
+        -- 使用子查询和GROUP_CONCAT合并标签
+        (
+        SELECT GROUP_CONCAT(t.name)
+        FROM experience_tags t
+        LEFT JOIN experience_post_tags ept ON t.id = ept.tag_id
+        WHERE ept.post_id = p.id
+        ) AS tags
+        FROM
+        experience_posts p
+        LEFT JOIN
+        users u ON p.user_id = u.id
+        -- 动态WHERE条件，用于筛选
+        <where>
+            p.status = 'PUBLISHED'
+            AND p.visibility = 'PUBLIC'
+            -- 更多筛选条件可以加在这里
+            <if test="query.tagId != null">
+                AND p.id IN (SELECT post_id FROM experience_post_tags WHERE tag_id = #{query.tagId})
+            </if>
+            <if test="query.searchKey != null and query.searchKey != ''">
+                AND p.title LIKE CONCAT('%', #{query.searchKey}, '%')
+            </if>
+        </where>
+        -- 动态排序
+        <choose>
+            <when test="query.sortBy == 'latest'">
+                ORDER BY p.created_at DESC
+            </when>
+            <when test="query.sortBy == 'mostCollected'">
+                ORDER BY p.collections_count DESC
+            </when>
+            <otherwise>
+                ORDER BY (p.likes_count * 2 + p.comments_count * 5 + p.views_count * 0.5) DESC
+            </otherwise>
+        </choose>
+    </select>
+</mapper>

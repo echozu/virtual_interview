@@ -7,6 +7,7 @@ import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.controller.ai.InterviewExpert;
 import com.echo.virtual_interview.exception.BusinessException;
 import com.echo.virtual_interview.mapper.*;
+import com.echo.virtual_interview.model.dto.experience.InterviewHistoryDTO;
 import com.echo.virtual_interview.model.dto.history.InterviewHistoryCardDTO;
 import com.echo.virtual_interview.model.dto.interview.AnalysisReportDTO;
 import com.echo.virtual_interview.model.dto.interview.TurnAnalysisResponse;
@@ -273,6 +274,7 @@ public class IInterviewServiceImpl implements IInterviewService {
                 .setUserId(userId.longValue())
                 .setResumeId(resumeId)
                 .setEndedAt(LocalDateTime.now())
+                .setStartedAt(LocalDateTime.now())
                 .setStatus("进行中");
 
         interviewSessionsMapper.insert(session);
@@ -649,6 +651,8 @@ public class IInterviewServiceImpl implements IInterviewService {
             return dto;
         }).collect(Collectors.toList());
     }
+
+
     /**
      * 辅助方法：将后端的中文状态映射为前端需要的英文状态
      * @param dbStatus 数据库中的状态
@@ -1005,7 +1009,7 @@ public class IInterviewServiceImpl implements IInterviewService {
 
         reportsMapper.insert(report);
 
-        // 更新 interview_sessions 表 (这部分不变，因为总分和总结分析依赖AI的综合评估)
+        // 更新 interview_sessions 表
         session.setOverallScore(dto.overallScore());
         session.setOverallAnalysis(dto.overallAnalysis());
         session.setStatus("已完成"); // 更新面试状态

@@ -1,5 +1,6 @@
 package com.echo.virtual_interview.service;
 
+import com.echo.virtual_interview.model.dto.experience.InterviewHistoryDTO;
 import com.echo.virtual_interview.model.dto.history.InterviewHistoryCardDTO;
 import com.echo.virtual_interview.model.dto.interview.process.RealtimeFeedbackDto;
 import com.echo.virtual_interview.model.dto.interview.process.VideoAnalysisPayload;
@@ -19,4 +20,5 @@ public interface IInterviewService {
     void generateAndSendGreetingAudio(String sessionId, Integer userId);
 
     List<InterviewHistoryCardDTO> getHistoryForUser(Integer userId);
+
 }

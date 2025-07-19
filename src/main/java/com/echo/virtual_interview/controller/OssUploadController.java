@@ -118,4 +118,48 @@ import java.io.ByteArrayInputStream;
             return ResultUtils.error(50001, "上传失败");
         }
     }
+
+    /**
+     * 上传面经图片
+     * @param file
+     * @param request
+     * @return
+     */
+    @PostMapping("/oss/experienceUrl")
+    public BaseResponse<String> uploadToExperienceOss(@RequestParam("file") MultipartFile file,
+                                                      HttpServletRequest request) {
+        try {
+            // 1. 验证用户权限
+            String userId = (String) request.getAttribute("user_id");
+            if(userId == null) {
+                return ResultUtils.error(40100,"未登录");
+            }
+
+            // 2. 验证文件类型
+            String contentType = file.getContentType();
+            if(!contentType.startsWith("image/")) {
+                return ResultUtils.error(40000, "只能保存图片");
+            }
+
+            // 3. 生成唯一文件名
+            String originalFilename = file.getOriginalFilename();
+            String fileExt = originalFilename.substring(originalFilename.lastIndexOf("."));
+            String fileName = "interview/experience/" + UUID.randomUUID() + fileExt;
+
+            // 4. 上传到OSS
+            ossClient.putObject(
+                    bucketName,
+                    fileName,
+                    new ByteArrayInputStream(file.getBytes())
+            );
+
+            // 5. 构建访问URL
+            String url = "https://" + bucketName + "." + endpoint + "/" + fileName;
+            return ResultUtils.success(url);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultUtils.error(50001, "上传失败");
+        }
+    }
     }

@@ -48,7 +48,6 @@ public class MybatisPlusConfig {
             this.strictInsertFill(metaObject, "updatedTime", LocalDateTime.class, LocalDateTime.now());
             this.strictInsertFill(metaObject, "startAt", LocalDateTime.class, LocalDateTime.now());
             this.strictInsertFill(metaObject, "startedAt", LocalDateTime.class, LocalDateTime.now());
-
             log.info("start insert fill ....");
             // 插入时，同时填充创建时间和更新时间
             this.strictInsertFill(metaObject, "createdAt", LocalDateTime::now, LocalDateTime.class);

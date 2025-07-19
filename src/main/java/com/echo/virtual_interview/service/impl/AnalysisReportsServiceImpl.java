@@ -3,21 +3,25 @@ package com.echo.virtual_interview.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.controller.ai.InterviewExpert;
 import com.echo.virtual_interview.exception.BusinessException;
 import com.echo.virtual_interview.mapper.*;
 import com.echo.virtual_interview.model.dto.analysis.*;
 import com.echo.virtual_interview.model.entity.*;
 import com.echo.virtual_interview.service.IAnalysisReportsService;
+import com.echo.virtual_interview.service.IInterviewGeneratedReportsService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.Resource;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.formula.functions.T;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +51,8 @@ public class AnalysisReportsServiceImpl extends ServiceImpl<AnalysisReportsMappe
     private final LearningResourcesMapper learningResourceMapper;
     private final LearningResourcesTopicsMapper learningResourcesTopicMapper; // 使用更新后的Mapper
     private final InterviewLearningRecommendationsMapper recommendationMapper; // 用于写入推荐结果
-
+    @Resource
+    private IInterviewGeneratedReportsService generatedReportsService;
     // 注入AI客户端和JSON处理工具
     private final InterviewExpert interviewExpert;
     private final ObjectMapper objectMapper;
@@ -56,59 +61,96 @@ public class AnalysisReportsServiceImpl extends ServiceImpl<AnalysisReportsMappe
     @Override
     @Cacheable(cacheNames = "interviewReports", key = "#sessionId")
     public InterviewReportResponseDTO getFullReportBySessionId(String sessionId) {
-        // --- 步骤 1: 从数据库并行获取所有需要的数据 ---
-        log.info("缓存未命中，开始执行 getFullReportBySessionId 逻辑，sessionId: {}", sessionId);
-        log.info("开始为会话ID {} 生成报告", sessionId);
-        AnalysisReports report = analysisReportMapper.selectOne(
-                new LambdaQueryWrapper<AnalysisReports>().eq(AnalysisReports::getSessionId, sessionId)
-        );
-        InterviewSessions session = interviewSessionMapper.selectById(sessionId);
+        log.info("L1 Redis缓存未命中，查询 L2 数据库, sessionId: {}", sessionId);
 
-        // 数据校验
-        if (report == null || session == null) {
-            log.error("未找到ID为 {} 的面试报告或会话记录", sessionId);
-            throw new RuntimeException("报告或会话记录不存在");
+        InterviewGeneratedReports archivedReport = generatedReportsService.getOne(
+                new LambdaQueryWrapper<InterviewGeneratedReports>().eq(InterviewGeneratedReports::getSessionId, sessionId)
+        );
+        Integer userId = UserIdContext.getUserIdContext();
+        if (archivedReport != null) {
+            log.info("L2 数据库命中，反序列化报告并返回, sessionId: {}", sessionId);
+            return deserializeFromEntity(archivedReport);
         }
 
-        // 明确地通过 session.channel_id 获取 channel 信息
+        log.info("L2 数据库未命中，开始 L3 实时生成新报告, sessionId: {}", sessionId);
+        InterviewReportResponseDTO newReport = generateNewReport(sessionId);
+
+        saveReportToDatabaseAsync(newReport,sessionId,userId);
+
+        return newReport;
+    }
+
+    /**
+     * 将数据库实体（只含一个JSON字符串）反序列化为完整的DTO
+     * @param entity 数据库实体
+     * @return 响应DTO
+     */
+    private InterviewReportResponseDTO deserializeFromEntity(InterviewGeneratedReports entity) {
+        try {
+            return objectMapper.readValue(entity.getReportData(), InterviewReportResponseDTO.class);
+        } catch (JsonProcessingException e) {
+            log.error("反序列化报告Entity为DTO时失败, sessionId: {}", entity.getSessionId(), e);
+            throw new BusinessException(500, "报告数据读取异常");
+        }
+    }
+
+    /**
+     * 将新生成的报告DTO异步保存到数据库
+     * @param reportDto 待保存的报告
+     */
+    @Async("yourThreadPoolTaskExecutor")
+    public void saveReportToDatabaseAsync(InterviewReportResponseDTO reportDto,String sessionId,Integer userId) {
+        if (reportDto == null || sessionId == null) {
+            log.error("无法异步保存报告，因为reportDto或sessionId为空");
+            return;
+        }
+        log.info("开始异步保存新生成的报告到数据库，sessionId: {}", sessionId);
+        try {
+            // 核心简化：整个序列化过程只有一行代码！
+            String reportJson = objectMapper.writeValueAsString(reportDto);
+
+            InterviewGeneratedReports entityToSave = new InterviewGeneratedReports()
+                    .setSessionId(sessionId)
+                    .setUserId(Long.valueOf(userId))
+                    .setReportData(reportJson);
+
+            generatedReportsService.saveOrUpdate(entityToSave,
+                    new LambdaQueryWrapper<InterviewGeneratedReports>()
+                            .eq(InterviewGeneratedReports::getSessionId, sessionId));
+            log.info("异步保存报告成功，sessionId: {}", sessionId);
+        } catch (Exception e) {
+            log.error("异步保存报告到数据库时发生错误, sessionId: {}", sessionId, e);
+        }
+    }
+
+    /**
+     * 核心的报告生成逻辑 (此部分代码无需任何改动)
+     */
+    private InterviewReportResponseDTO generateNewReport(String sessionId) {
+        log.info("开始为会话ID {} 从原始表获取数据", sessionId);
+        AnalysisReports report = analysisReportMapper.selectOne(new LambdaQueryWrapper<AnalysisReports>().eq(AnalysisReports::getSessionId, sessionId));
+        InterviewSessions session = interviewSessionMapper.selectById(sessionId);
+        if (report == null || session == null) {
+            throw new BusinessException(404,"报告或会话记录不存在");
+        }
         InterviewChannels channel = interviewChannelMapper.selectById(session.getChannelId());
         if (channel == null) {
-            log.error("未找到会话 {} 关联的频道ID {}", sessionId, session.getChannelId());
-            throw new RuntimeException("面试频道信息不存在");
+            throw new BusinessException(404,"面试频道信息不存在");
         }
-
-        List<InterviewDialogue> dialogues = interviewDialogueMapper.selectList(
-                new LambdaQueryWrapper<InterviewDialogue>()
-                        .eq(InterviewDialogue::getSessionId, sessionId)
-                        .orderByAsc(InterviewDialogue::getSequence)
-
-        );
-        // 此处省略获取简历信息的代码，实际中应一并获取
-
-        // --- 步骤 2: 直接从数据库数据构建 question_analysis_data ---
+        List<InterviewDialogue> dialogues = interviewDialogueMapper.selectList(new LambdaQueryWrapper<InterviewDialogue>().eq(InterviewDialogue::getSessionId, sessionId).orderByAsc(InterviewDialogue::getSequence));
         List<QuestionAnalysisDTO> questionAnalysisData = buildQuestionAnalysisFromDB(dialogues);
-
-        // --- 步骤 3: 准备调用AI所需的数据和Prompt ---
         String aiMessage = buildAiMessage(channel, report, dialogues);
         String aiPrompt = buildAiPrompt();
-
-        // --- 步骤 4: 调用AI服务获取高阶分析结果 ---
-        log.info("为会话 {} 调用AI进行高阶分析", sessionId);
         String aiResultJson = interviewExpert.aiInterviewByAnalysis(aiPrompt, aiMessage);
-        log.info("分析报告中ai的返回：{}", aiResultJson);
         String aiResultString = parseAiResult(aiResultJson);
-        AiAnalysisResultDTO aiResult =null;
+        AiAnalysisResultDTO aiResult;
         try {
-            aiResult=objectMapper.readValue(aiResultString, AiAnalysisResultDTO.class);
-        }catch (JsonProcessingException e) {
+            aiResult = objectMapper.readValue(aiResultString, AiAnalysisResultDTO.class);
+        } catch (JsonProcessingException e) {
             log.error("AI生成学习报告时，返回的JSON解析失败: {}", aiResultJson, e);
-            throw new BusinessException(500,"AI生成学习报告失败");
+            throw new BusinessException(500, "AI生成学习报告失败");
         }
-
-        // --- 步骤 5: 根据AI识别的薄弱知识点，查询并生成学习推荐 ---
         List<RecommendationDTO> recommendations = generateRecommendations(aiResult.getWeak_topics_with_reasons(), sessionId);
-
-        // --- 步骤 6: 组装最终的响应DTO ---
         log.info("为会话 {} 组装最终报告", sessionId);
         return buildResponseDTO(report, session, channel, dialogues, aiResult, recommendations, questionAnalysisData);
     }

@@ -2,4 +2,21 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.echo.virtual_interview.mapper.InterviewSessionsMapper">
 
+    <select id="listHistoryWithExperience"
+            resultType="com.echo.virtual_interview.model.dto.experience.InterviewHistoryDTO">
+        SELECT
+            s.id AS sessionId,
+            c.title AS interviewTitle,
+            s.started_at AS interviewDate,
+            s.overall_score AS overallScore
+        FROM
+            interview_sessions s
+                LEFT JOIN
+            interview_channels c ON s.channel_id = c.id
+        WHERE
+            s.user_id = #{userId}
+          AND s.status = '已完成'
+        ORDER BY
+            s.started_at DESC
+    </select>
 </mapper>

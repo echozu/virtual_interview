@@ -111,16 +111,16 @@ xunfei:
   api: # 大模型配置
     key: "***REMOVED***"
     url: "https://spark-api-open.xf-yun.com/v1/chat/completions"
-    model: "generalv3"
+    model: "pro-128k"
   rtasr: # speech-to-Text 语音转写 配置
     appid: "bbbfe203"
     secret-key: "***REMOVED***"
     host: "rtasr.xfyun.cn/v1/ws"
-  tts: # Text-To-Speech (语音合成) 配置 【yzx的】
+  tts: # Text-To-Speech (语音合成) 配置 【mj的】
     host: "cbm01.cn-huabei-1.xf-yun.com"
-    app-id: "e871abfa"
-    api-key: "9b235c37a1b6865cb69502bd2a3df043"
-    api-secret: "NTNiNzlmYzFlYjM0NzJmNDUzMmY4ODFl"
+    app-id: "70dc30cd"
+    api-key: "***REMOVED***"
+    api-secret: "***REMOVED***"
     vcn: "x5_lingfeiyi_flow" # 默认发音人，可以根据需求更改
   knowledge:
     app-id: "bbbfe203"
