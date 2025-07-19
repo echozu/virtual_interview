@@ -56,6 +56,7 @@ public class ExperiencePostController {
 
     /**
      * 3.获取面经详情
+     * 获取该发布者的分析报告+面经详情、差评论区等
      * @param postId 面经的唯一ID
      * @return 包含完整信息的面经详情
      */

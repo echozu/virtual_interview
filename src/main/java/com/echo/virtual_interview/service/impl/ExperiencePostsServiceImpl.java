@@ -4,15 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.exception.BusinessException;
-import com.echo.virtual_interview.mapper.InterviewSessionsMapper;
+import com.echo.virtual_interview.mapper.*;
 import com.echo.virtual_interview.model.dto.analysis.ChartDataDTO;
 import com.echo.virtual_interview.model.dto.analysis.InterviewReportResponseDTO;
 import com.echo.virtual_interview.model.dto.analysis.RadarDataDTO;
 import com.echo.virtual_interview.model.dto.experience.*;
 import com.echo.virtual_interview.model.entity.*;
-import com.echo.virtual_interview.mapper.ExperiencePostsMapper;
 import com.echo.virtual_interview.service.*;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Async;
@@ -50,21 +51,16 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
     @Resource
     private InterviewSessionsMapper interviewSessionMapper;
 
-    // --- 注入所有需要的服务 ---
+
     @Resource
-    private IUsersService userService;
+    private ExperienceInteractionsMapper interactionMapper;
     @Resource
-    private IInterviewService interviewService;
+    private ExperiencePostsMapper experiencePostMapper;
     @Resource
-    private IInterviewChannelsService interviewChannelService;
+    private InterviewGeneratedReportsMapper reportMapper;
+
     @Resource
-    private IAnalysisReportsService analysisReportService;
-    @Resource
-    private IExperienceInteractionsService interactionService;
-    @Resource
-    private IInterviewSessionsService interviewSessionsService;
-    @Resource
-    private IInterviewGeneratedReportsService interviewGeneratedReports;
+    private UsersMapper userMapper;
     @Override
     @Transactional // 开启事务，保证数据一致性
     public Long createExperiencePost(ExperiencePostCreateRequest createRequest) {
@@ -85,27 +81,35 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
             throw new BusinessException(400, "关联的面试ID不能为空");
         }
 
-//        // 步骤 2: 业务校验：一次面试会话只能创建一篇面经
-//        long count = this.count(new QueryWrapper<ExperiencePosts>().eq("session_id", createRequest.getSessionId()));
-//        if (count > 0) {
-//            throw new BusinessException(500, "该面试已分享过面经，请勿重复创建");
-//        }
-
-        // 步骤 3: 构造实体并拷贝属性
+        // 步骤 2: 构造实体并拷贝基本属性
         ExperiencePosts post = new ExperiencePosts();
         BeanUtils.copyProperties(createRequest, post);
         post.setUserId(Long.valueOf(userId)); // 设置作者ID
+        // 设置初始状态，建议使用枚举
+        post.setStatus(createRequest.getVisibility());
 
-        // 步骤 4: 处理标签列表 -> 转换为JSON字符串
+        // 步骤 3: 处理标签列表 -> 转换为JSON字符串
         List<String> tagsList = createRequest.getTags();
         if (tagsList != null && !tagsList.isEmpty()) {
             try {
-                // 使用ObjectMapper将List<String>序列化为JSON数组字符串
                 String tagsJson = objectMapper.writeValueAsString(tagsList);
                 post.setTags(tagsJson);
             } catch (JsonProcessingException e) {
                 log.error("标签列表序列化为JSON时出错, tags: {}", tagsList, e);
                 throw new BusinessException(500, "系统错误，处理标签失败");
+            }
+        }
+
+        // 步骤 4: 处理 sharedReportElements -> 转换为JSON字符串
+        Object sharedElements = createRequest.getSharedReportElements();
+        if (sharedElements != null) {
+            try {
+                // 不论 sharedElements 是 Map 还是其他对象，都将其序列化为 JSON 字符串
+                String sharedElementsJson = objectMapper.writeValueAsString(sharedElements);
+                post.setSharedReportElements(sharedElementsJson);
+            } catch (JsonProcessingException e) {
+                log.error("分享报告元素序列化为JSON时出错, elements: {}", sharedElements, e);
+                throw new BusinessException(500, "系统错误，处理分享设置失败");
             }
         }
 
@@ -126,20 +130,28 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
      * 这是一个固定的列表，直接在代码中定义。
      * @return 模块列表
      */
-    @Override
+    /**
+     * 获取可分享的、可展示/隐藏的报告模块列表
+     * @return 可分享模块的列表
+     */
     public List<ShareableElementDTO> getShareableElements() {
         List<ShareableElementDTO> elements = new ArrayList<>();
 
-        // 从您的 InterviewReportResponseDTO 中提取可分享的模块
+        // --- 核心模块 (默认分享) ---
         elements.add(new ShareableElementDTO("overall_summary", "总体表现概述", true));
         elements.add(new ShareableElementDTO("radar_data", "能力雷达图", true));
         elements.add(new ShareableElementDTO("behavioral_analysis", "行为表现分析", true));
         elements.add(new ShareableElementDTO("overall_suggestions", "综合改进建议", true));
-        elements.add(new ShareableElementDTO("question_analysis_data", "逐题分析详情", false)); // 默认不分享，因为信息太详细
-        elements.add(new ShareableElementDTO("tension_curve_data", "紧张度曲线", false)); // 默认不分享，比较敏感
-        elements.add(new ShareableElementDTO("filler_word_usage", "口头禅使用分析", false)); // 默认不分享，比较敏感
+        elements.add(new ShareableElementDTO("behavioral_suggestions", "行为细节建议", true));
         elements.add(new ShareableElementDTO("recommendations", "个性化学习推荐", true));
-        // dialogues（完整对话记录）通常过于敏感，一般不作为可选项
+
+        // --- 敏感/详细模块 (默认不分享) ---
+        elements.add(new ShareableElementDTO("question_analysis_data", "逐题分析详情", false));
+        elements.add(new ShareableElementDTO("tension_curve_data", "紧张度曲线", false));
+        elements.add(new ShareableElementDTO("filler_word_usage", "口头禅使用分析", false));
+        elements.add(new ShareableElementDTO("eye_contact_percentage", "眼神交流分析", false));
+
+        // position, interviewDate, interviewType 等作为基础信息，始终展示，不作为可选项
 
         return elements;
     }
@@ -193,189 +205,125 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
         return historyList;
     }
     @Override
+    @Transactional // 包含写操作（浏览量+1），建议开启事务
+    @SneakyThrows // 使用 Lombok 简化受检异常（如JSON处理异常）的书写
     public ExperiencePostDetailResponse getExperiencePostDetail(Long postId) {
-        // --- 步骤 1: 查询面经主表信息 ---
-        ExperiencePosts post = this.getById(postId);
-        if (post == null || !"PUBLISHED".equals(post.getStatus())) {
-            throw new BusinessException(404, "面经不存在或未发布");
+        // 步骤 0: 获取当前查看者ID（如果未登录，则为null）
+        Integer viewerId = UserIdContext.getUserIdContext();
+
+        // 步骤 1: 获取面经主帖信息
+        ExperiencePosts post = experiencePostMapper.selectById(postId);
+        if (post == null || !"PUBLIC".equals(post.getStatus())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "面经不存在或未发布");
         }
 
-        // --- 步骤 2: 异步更新浏览量 ---
-        // 为了提升接口响应速度，将写操作异步化
-        this.incrementViewsCount(postId);
+        // 步骤 2: 增加浏览量（这里使用简化同步实现）
+        post.setViewsCount(post.getViewsCount() + 1);
+        experiencePostMapper.updateById(post);
 
-        // --- 步骤 3: 初始化响应DTO ---
-        ExperiencePostDetailResponse detailResponse = new ExperiencePostDetailResponse();
-        BeanUtils.copyProperties(post, detailResponse);
+        // 步骤 3: 获取关联数据
+        InterviewGeneratedReports report = reportMapper.selectOne(new QueryWrapper<InterviewGeneratedReports>().eq("session_id", post.getSessionId()));
+        if (report == null) throw new BusinessException(ErrorCode.SYSTEM_ERROR, "关联的面试报告丢失");
 
-        // --- 步骤 4: 组装聚合信息 ---
-        // 使用 CompletableFuture 并行执行多个不相关的查询，提升性能
-        Integer currentUserId = UserIdContext.getUserIdContext();
+        Users author = userMapper.selectById(post.getUserId());
+        if (author == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "作者信息不存在");
 
-        CompletableFuture<Void> authorFuture = CompletableFuture.runAsync(() ->
-                assembleAuthorInfo(detailResponse, post));
+        // 步骤 4: 根据分享设置，构建筛选后的AI报告
+        SharedAiReportDTO filteredAiReport = buildSharedAiReport(post.getSharedReportElements(), report.getReportData());
 
-        CompletableFuture<Void> tagsFuture = CompletableFuture.runAsync(() ->
-                assembleTags(detailResponse, post));
+        // 步骤 5: 检查当前查看者的互动状态（是否点赞/收藏）
+        boolean isLiked = false;
+        boolean isCollected = false;
+        if (viewerId != null) {
+            isLiked = interactionMapper.exists(new QueryWrapper<ExperienceInteractions>()
+                    .eq("post_id", postId)
+                    .eq("user_id", viewerId)
+                    .eq("interaction_type", "LIKE"));
+            isCollected = interactionMapper.exists(new QueryWrapper<ExperienceInteractions>()
+                    .eq("post_id", postId)
+                    .eq("user_id", viewerId)
+                    .eq("interaction_type", "COLLECT"));
+        }
 
-        CompletableFuture<Void> interactionFuture = CompletableFuture.runAsync(() ->
-                assembleInteractionStatus(detailResponse, postId, currentUserId));
-
-        CompletableFuture<Void> reportAndChannelFuture = CompletableFuture.runAsync(() ->
-                assembleReportAndChannelInfo(detailResponse, post));
-
-        // 等待所有异步任务完成
-        CompletableFuture.allOf(authorFuture, tagsFuture, interactionFuture, reportAndChannelFuture).join();
-
-        return detailResponse;
+        // 步骤 6: 组装并返回最终的响应DTO
+        return buildDetailResponse(post, author, filteredAiReport, isLiked, isCollected);
     }
 
     /**
-     * 异步增加浏览量
+     * 从所有获取和处理过的数据中，组装最终的响应DTO。
      */
-    @Async
-    public void incrementViewsCount(Long postId) {
-        // 使用SQL更新，避免先读后写可能产生的并发问题
-        this.update().setSql("views_count = views_count + 1").eq("id", postId).update();
-    }
+    @SneakyThrows
+    private ExperiencePostDetailResponse buildDetailResponse(ExperiencePosts post, Users author, SharedAiReportDTO filteredAiReport, boolean isLiked, boolean isCollected) {
 
-    // --- 以下为组装各个部分的私有方法 ---
+        // 处理作者信息（区分匿名和非匿名）
+        ExperiencePostDetailResponse.AuthorInfoDTO authorInfo = post.getIsAnonymous()
+                ? ExperiencePostDetailResponse.AuthorInfoDTO.builder().nickname("匿名用户").avatar(null).build()
+                : ExperiencePostDetailResponse.AuthorInfoDTO.builder().userId(author.getId()).nickname(author.getNickname()).avatar(author.getAvatarUrl()).build();
 
-    private void assembleAuthorInfo(ExperiencePostDetailResponse detailResponse, ExperiencePosts post) {
-        Users author = userService.getById(post.getUserId());
-        if (author != null) {
-            ExperiencePostDetailResponse.AuthorInfoVO authorInfo = new ExperiencePostDetailResponse.AuthorInfoVO();
-            if (Boolean.TRUE.equals(post.getIsAnonymous())) {
-                authorInfo.setAuthorId(author.getId().intValue());
-                authorInfo.setNickname("匿名用户");
-                // 匿名用户可以不显示头像或使用默认头像
-                authorInfo.setAvatarUrl(null);
-            } else {
-                authorInfo.setAuthorId(author.getId().intValue());
-                authorInfo.setNickname(author.getNickname());
-                authorInfo.setAvatarUrl(author.getAvatarUrl());
-            }
-            detailResponse.setAuthorInfo(authorInfo);
-        }
-    }
+        // 构建帖子统计数据
+        ExperiencePostDetailResponse.PostStatsDTO stats = ExperiencePostDetailResponse.PostStatsDTO.builder()
+                .viewsCount(post.getViewsCount())
+                .likesCount(post.getLikesCount())
+                .commentsCount(post.getCommentsCount())
+                .collectionsCount(post.getCollectionsCount())
+                .build();
 
-    private void assembleTags(ExperiencePostDetailResponse detailResponse, ExperiencePosts post) {
-        String tagsJson = post.getTags();
-        if (StringUtils.isNotBlank(tagsJson)) {
-            try {
-                List<String> tags = objectMapper.readValue(tagsJson, new TypeReference<>() {});
-                detailResponse.setTags(tags);
-            } catch (JsonProcessingException e) {
-                log.error("解析面经标签JSON失败, postId: {}, tagsJson: {}", post.getId(), tagsJson, e);
-                detailResponse.setTags(Collections.emptyList());
-            }
-        }
-    }
+        // 构建当前用户的互动状态
+        ExperiencePostDetailResponse.ViewerInteractionDTO viewerInteraction = ExperiencePostDetailResponse.ViewerInteractionDTO.builder()
+                .isLiked(isLiked)
+                .isCollected(isCollected)
+                .build();
 
-    private void assembleInteractionStatus(ExperiencePostDetailResponse detailResponse, Long postId, Integer currentUserId) {
-        if (currentUserId == null) {
-            detailResponse.setIsLiked(false);
-            detailResponse.setIsCollected(false);
-            return;
-        }
-        long likeCount = interactionService.count(new QueryWrapper<ExperienceInteractions>()
-                .eq("post_id", postId)
-                .eq("user_id", currentUserId)
-                .eq("interaction_type", "LIKE"));
-        long collectCount = interactionService.count(new QueryWrapper<ExperienceInteractions>()
-                .eq("post_id", postId)
-                .eq("user_id", currentUserId)
-                .eq("interaction_type", "COLLECT"));
-        detailResponse.setIsLiked(likeCount > 0);
-        detailResponse.setIsCollected(collectCount > 0);
+        // 解析标签JSON字符串为列表
+        List<String> tags = post.getTags() != null ? objectMapper.readValue(post.getTags(), new TypeReference<>() {}) : Collections.emptyList();
+
+        // 使用Builder模式构建最终响应对象
+        return ExperiencePostDetailResponse.builder()
+                .postId(post.getId())
+                .title(post.getTitle())
+                .content(post.getContent())
+                .experienceUrl(post.getExperienceUrl())
+                .createdAt(post.getCreatedAt())
+                .tags(tags)
+                .authorInfo(authorInfo)
+                .stats(stats)
+                .viewerInteraction(viewerInteraction)
+                .aiReport(filteredAiReport)
+                .build();
     }
 
     /**
-     * 组装报告详情中的 "AI报告摘要" 和 "面试频道信息" 部分
-     * @param detailResponse 待填充的响应DTO
-     * @param post 当前的面经实体
-     *             1.直接把分析报告组装出去 但是根据true或false将一些字段设置为false即可
+     * AI报告的核心筛选逻辑。
+     * 读取完整报告，然后根据分享设置，将不分享的模块置为null。
      */
-    private void assembleReportAndChannelInfo(ExperiencePostDetailResponse detailResponse, ExperiencePosts post) {
-        // 1. 获取面试会话和频道信息 (此部分逻辑正确，保持不变)
-        InterviewSessions session = interviewSessionsService.getOne(new LambdaQueryWrapper<InterviewSessions>().eq(InterviewSessions::getId, post.getSessionId()));
-        if (session != null && session.getChannelId() != null) {
-            InterviewChannels channel = interviewChannelService.getById(session.getChannelId());
-            if (channel != null) {
-                ExperiencePostDetailResponse.InterviewChannelInfoVO channelInfo = new ExperiencePostDetailResponse.InterviewChannelInfoVO();
-                channelInfo.setChannelId(channel.getId());
-                channelInfo.setTitle(channel.getTitle());
-                detailResponse.setChannelInfo(channelInfo);
-            }
+    @SneakyThrows
+    private SharedAiReportDTO buildSharedAiReport(String sharedElementsJson, String fullReportJson) {
+        // 如果没有分享设置（老数据兼容），则默认全部分享（除了敏感信息）
+        if (sharedElementsJson == null) {
+            return objectMapper.readValue(fullReportJson, SharedAiReportDTO.class);
         }
 
-        // 2. 从面经实体中获取用户设置的分享偏好 (此部分逻辑正确，保持不变)
-        // shared_report_elements 字段存储了类似 {"radar_data": true, "overall_summary": false} 的JSON
-        Map<String, Boolean> sharingPrefs = Collections.emptyMap();
-        if (post.getSharedReportElements() != null) {
-            try {
-                sharingPrefs = objectMapper.convertValue(post.getSharedReportElements(), new TypeReference<>() {});
-            } catch (IllegalArgumentException e) {
-                log.error("解析分享偏好JSON失败, postId: {}", post.getId(), e);
-            }
-        }
+        // 解析用户的分享设置
+        SharedReportElementsDTO settings = objectMapper.readValue(sharedElementsJson, SharedReportElementsDTO.class);
+        // 解析完整的报告数据
+        SharedAiReportDTO fullReport = objectMapper.readValue(fullReportJson, SharedAiReportDTO.class);
 
-        // 3. 如果用户没有选择任何分享项，则提前结束
-        if (sharingPrefs.isEmpty() || sharingPrefs.values().stream().noneMatch(Boolean.TRUE::equals)) {
-            return;
-        }
+        // 核心逻辑：将未分享（设置为false）的字段置为null
+        // Jackson在序列化时会自动忽略null值
+        if (!settings.isOverallSummary()) fullReport.setOverallSummary(null);
+        if (!settings.isRadarData()) fullReport.setRadarData(null);
+        if (!settings.isBehavioralAnalysis()) fullReport.setBehavioralAnalysis(null);
+        if (!settings.isOverallSuggestions()) fullReport.setOverallSuggestions(null);
+        if (!settings.isBehavioralSuggestions()) fullReport.setBehavioralSuggestions(null);
+        if (!settings.isQuestionAnalysisData()) fullReport.setQuestionAnalysisData(null);
+        if (!settings.isTensionCurveData()) fullReport.setTensionCurveData(null);
+        if (!settings.isFillerWordUsage()) fullReport.setFillerWordUsage(null);
+        if (!settings.isEyeContactPercentage()) fullReport.setEyeContactPercentage(null);
+        if (!settings.isRecommendations()) fullReport.setRecommendations(null);
 
-        // 4. 从数据库获取完整的持久化报告 (此部分逻辑正确，保持不变)
-        InterviewGeneratedReports generatedReportEntity = interviewGeneratedReports.getOne(
-                new LambdaQueryWrapper<InterviewGeneratedReports>().eq(InterviewGeneratedReports::getSessionId, post.getSessionId())
-        );
-
-        if (generatedReportEntity == null || StringUtils.isBlank(generatedReportEntity.getReportData())) {
-            log.warn("未找到或报告数据为空，无法为面经 postId: {} 组装AI摘要", post.getId());
-            return;
-        }
-
-        // 5. 根据分享偏好，选择性地从完整报告中提取数据并填充
-        try {
-            // 反序列化完整的报告JSON
-            InterviewReportResponseDTO fullReport = objectMapper.readValue(generatedReportEntity.getReportData(), InterviewReportResponseDTO.class);
-
-            // 创建用于返回的摘要对象
-            ExperiencePostDetailResponse.AiReportSummaryVO summaryVO = new ExperiencePostDetailResponse.AiReportSummaryVO();
-            summaryVO.setSessionId(post.getSessionId());
-
-            // --- 核心逻辑：遍历检查每一项分享设置 ---
-
-            // 检查 "overall_summary" 是否被设置为 true
-            if (sharingPrefs.getOrDefault("overall_summary", false)) {
-                summaryVO.setHighlights(fullReport.getOverall_summary());
-            }
-
-            // 检查 "radar_data" 是否被设置为 true
-            if (sharingPrefs.getOrDefault("radar_data", false)) {
-                if (fullReport.getRadar_data() != null) {
-                    Map<String, Object> radarMap = objectMapper.convertValue(fullReport.getRadar_data(), new TypeReference<>() {});
-                    summaryVO.setRadarChartData(radarMap);
-                }
-            }
-
-            // 检查 "overall_suggestions" 是否被设置为 true
-            if (sharingPrefs.getOrDefault("overall_suggestions", false)) {
-                summaryVO.setSuggestions(fullReport.getOverall_suggestions());
-            }
-
-            // 检查 "overall_score" 是否被设置为 true
-            if (sharingPrefs.getOrDefault("overall_score", false) && session != null) {
-                summaryVO.setOverallScore(session.getOverallScore());
-            }
-
-            // --- 将填充好的摘要对象设置到最终的响应中 ---
-            detailResponse.setAiReportSummary(summaryVO);
-
-        } catch (JsonProcessingException e) {
-            log.error("反序列化已存储的报告JSON失败, sessionId: {}", post.getSessionId(), e);
-        }
+        return fullReport;
     }
+
 
     @Override
     public Page<ExperiencePostVO> listExperiencePostsByPage(ExperiencePostQueryRequest queryRequest) {

@@ -98,7 +98,7 @@ public class AnalysisReportsServiceImpl extends ServiceImpl<AnalysisReportsMappe
      * 将新生成的报告DTO异步保存到数据库
      * @param reportDto 待保存的报告
      */
-    @Async("yourThreadPoolTaskExecutor")
+    @Async("taskExecutor")
     public void saveReportToDatabaseAsync(InterviewReportResponseDTO reportDto,String sessionId,Integer userId) {
         if (reportDto == null || sessionId == null) {
             log.error("无法异步保存报告，因为reportDto或sessionId为空");

@@ -14,12 +14,15 @@ import com.echo.virtual_interview.service.IInterviewSessionsService;
 import com.echo.virtual_interview.service.impl.AnalysisStatusService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 /**
  * 面试接口
@@ -65,41 +68,44 @@ public class InterviewController {
         // 3. 立即返回成功响应，告知前端 "任务已接收，请等待WebSocket推送"
         return ResultUtils.success("请等待websocket响应.");
     }
-
+    @Autowired
+    @Qualifier("videoAnalysisExecutor")
+    private ExecutorService videoAnalysisExecutor;
     /**
-     * 接收视频分析结果，包含行为数据、关键帧图像和 sessionId。
+     * 接收视频分析结果。
      * 此接口由Python分析服务调用。
-     *
-     * @param payload 包含所有分析结果的完整JSON负载，自动映射为Java对象。
-     * @return 一个统一的响应对象，告知Python服务是否接收成功。
      */
-
     @PostMapping("/process/python/video_analyse")
     public BaseResponse<String> receiveVideoAnalysis(@RequestBody VideoAnalysisPayload payload) {
         System.out.println("成功接收到 analysisId 的分析结果: " + payload.getAnalysisId());
 
-        new Thread(() -> {
+        // 使用单线程执行器提交任务，而不是 new Thread()
+        videoAnalysisExecutor.submit(() -> {
             try {
+                // 这里的代码块会进入任务队列，等待唯一的那个线程来执行
+                System.out.println("开始处理 analysisId: " + payload.getAnalysisId());
                 RealtimeFeedbackDto finalResult = interviewService.processAndStoreAnalysis(payload);
                 analysisStatusService.updateTaskResult(payload.getAnalysisId(), "COMPLETED", finalResult);
+                System.out.println("成功处理 analysisId: " + payload.getAnalysisId());
             } catch (Exception e) {
                 analysisStatusService.updateTaskResult(payload.getAnalysisId(), "FAILED", e.getMessage());
                 System.err.println("处理 analysisId " + payload.getAnalysisId() + " 时发生异步错误: " + e.getMessage());
             }
-        }).start();
+        });
 
-        return ResultUtils.success("数据已成功接收，正在后台处理。");
+        // 立即返回，告诉Python任务已接收
+        return ResultUtils.success("数据已成功接收，正在后台排队处理。");
     }
 
-
     /**
-     * 视频分析的轮询接口
-     * 前端通过此接口，使用 analysisId 轮询分析结果。
+     * 视频分析的轮询接口 (这个接口保持不变)
      */
     @GetMapping("/process/analysis/result/{analysisId}")
     public BaseResponse<AnalysisStatusService.AnalysisResult> getAnalysisResult(@PathVariable String analysisId) {
         AnalysisStatusService.AnalysisResult result = analysisStatusService.getTaskResult(analysisId);
         if (result == null) {
+            // 这里可以稍微优化一下，如果任务确实还没开始，可以给一个更明确的提示
+            // 但目前的逻辑也是可以的
             return ResultUtils.success(new AnalysisStatusService.AnalysisResult("PENDING", "分析任务正在队列中，请稍候..."));
         }
         return ResultUtils.success(result);
