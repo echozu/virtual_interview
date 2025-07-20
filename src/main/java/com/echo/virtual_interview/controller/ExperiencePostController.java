@@ -102,4 +102,11 @@ public class ExperiencePostController {
         experiencePostService.deleteExperiencePost(postId);
         return ResultUtils.success(true);
     }
+
+    /**
+     * 职业评测
+     * 根据简历和面试的过程记录、评价，生成职业匹配度
+     */
+
+
 }

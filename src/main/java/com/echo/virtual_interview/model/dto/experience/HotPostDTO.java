@@ -20,4 +20,6 @@ public class HotPostDTO {
     private String title;
     private String experienceUrl;
     private List<String> tags;
+    // 热度值
+    private Integer likesCount;
 }

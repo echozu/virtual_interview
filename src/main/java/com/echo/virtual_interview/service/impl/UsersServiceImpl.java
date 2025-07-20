@@ -70,7 +70,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
             QueryWrapper<Users> queryWrapperEmail = new QueryWrapper<>();
             queryWrapperEmail.lambda().eq(Users::getEmail, email);
-            long count2 = this.baseMapper.selectCount(queryWrapper);
+            long count2 = this.baseMapper.selectCount(queryWrapperEmail);
             if (count2 > 0) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱已被注册");
             }

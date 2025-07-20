@@ -5,6 +5,7 @@ import com.echo.virtual_interview.model.dto.interview.channel.ChannelFilterDTO;
 import com.echo.virtual_interview.model.entity.InterviewChannels;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -41,5 +42,15 @@ public interface InterviewChannelsMapper extends BaseMapper<InterviewChannels> {
      * @return 知识点名称列表
      */
     List<String> selectTopicNamesByChannelId(@Param("channelId") Long channelId);
-
+    /**
+     * 根据用户ID，查询该用户所有已完成面试中使用过的所有频道信息。
+     * 使用 DISTINCT 确保每个频道只返回一次。
+     * @param userId 用户ID
+     * @return 频道列表
+     */
+    @Select("SELECT DISTINCT ic.* " +
+            "FROM interview_channels ic " +
+            "JOIN interview_sessions s ON ic.id = s.channel_id " +
+            "WHERE s.user_id = #{userId} AND s.status = '已完成' AND s.channel_id IS NOT NULL")
+    List<InterviewChannels> findDistinctChannelsByUserId(@Param("userId") Long userId);
 }

@@ -306,7 +306,11 @@ public class IInterviewServiceImpl implements IInterviewService {
         // --- 2. 组装用于AI分析的输入数据 ---
         if (payload.getAnalysisByHalfMinute() == null || payload.getAnalysisByHalfMinute().isEmpty()) {
             log.warn("ID: {} 的分析数据中 analysisByHalfMinute 为空，无法进行AI分析。", payload.getAnalysisId());
-            return null;
+            String summary = "请您调整坐姿，确保面部正对摄像头且光线充足，这样我们才能给您更准确的反馈。请继续加油！";
+            String suggestion = "请您调整坐姿，确保面部正对摄像头且光线充足，这样我们才能给您更准确的反馈。请继续加油！";
+            String status = "NEEDS_IMPROVEMENT"; // 提示用户需要做出调整
+            String detailedAnalysis = "系统因未能从视频中提取有效的分析块(analysisByHalfMinute为空)。";
+            return new RealtimeFeedbackDto(summary, suggestion, status, detailedAnalysis);
         }
         var latestReport = payload.getAnalysisByHalfMinute().get(payload.getAnalysisByHalfMinute().size() - 1);
 

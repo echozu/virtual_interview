@@ -348,7 +348,7 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
             dto.setPostId(((Number) rawPost.get("postId")).longValue());
             dto.setTitle((String) rawPost.get("title"));
             dto.setExperienceUrl((String) rawPost.get("experienceUrl"));
-
+            dto.setLikesCount(((Number) rawPost.get("likesCount")).intValue());
             String tagsJson = (String) rawPost.get("tags");
             if (StringUtils.isNotBlank(tagsJson)) {
                 try {

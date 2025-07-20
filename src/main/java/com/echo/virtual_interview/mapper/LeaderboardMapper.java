@@ -19,7 +19,7 @@ public interface LeaderboardMapper {
      * @return 热门帖子列表
      */
 
-    List<Map<String, Object>> findTopLikedPostsInPeriod( // <--- 修改返回类型
+    List<Map<String, Object>> findTopLikedPostsInPeriod(
                                                          @Param("startTime") LocalDateTime startTime,
                                                          @Param("limit") int limit
     );

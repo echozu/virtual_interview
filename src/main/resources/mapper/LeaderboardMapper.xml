@@ -7,7 +7,8 @@
         SELECT p.id             AS postId,
                p.title,
                p.experience_url as experienceUrl,
-               p.tags
+               p.tags,
+               p.likes_count as likesCount
         FROM experience_posts p
                  JOIN
              experience_interactions i ON p.id = i.post_id

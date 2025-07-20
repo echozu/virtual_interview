@@ -3,6 +3,7 @@ package com.echo.virtual_interview.controller.ai;
 import com.echo.virtual_interview.adapater.ResumeAndChannelAdapter;
 import com.echo.virtual_interview.controller.ai.advisor.MyLoggerAdvisor;
 import com.echo.virtual_interview.controller.ai.chatMemory.MysqlInterviewMemory;
+import com.echo.virtual_interview.model.dto.career.CareerAssessment;
 import com.echo.virtual_interview.model.dto.interview.AnalysisReportDTO;
 import com.echo.virtual_interview.model.dto.interview.TurnAnalysisResponse;
 import com.echo.virtual_interview.model.dto.interview.channel.ChannelDetailDTO;
@@ -298,7 +299,12 @@ public class InterviewExpert {
                 .user(message)
                 .call().content();
     }
-
+    public String aiInterviewGeneratePersonalReport(String prompt) {
+        return this.chatClient
+                .prompt()
+                .user(prompt)
+                .call().content();
+    }
     /**
      * 一个简单的工具类，用于从可能包含额外文本的字符串中提取出JSON部分。
      */
