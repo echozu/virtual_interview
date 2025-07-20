@@ -24,6 +24,7 @@ import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -414,8 +416,59 @@ public class ExperiencePostsServiceImpl extends ServiceImpl<ExperiencePostsMappe
                 .mostCommentedPosts(mostCommentedPosts)
                 .build();
     }
+
     @Override
-    @SneakyThrows // 简化JsonProcessingException的书写
+    @SneakyThrows
+    @Cacheable(cacheNames = "ExperienceFilterOptions")
+    public Map<String, Object> getExperienceFilterOptions() {
+        // 使用 LinkedHashMap 来保证前端展示的顺序
+        Map<String, Object> filterMap = new LinkedHashMap<>();
+
+        // 1. 定义固定的筛选分类
+        List<String> jobTypes = Arrays.asList("校招", "社招", "实习", "兼职", "不限");
+        // 建议：未来 positions 和 companies 也可以从 interview_channels 表中动态获取
+        List<String> positions = Arrays.asList("后端工程师", "前端工程师", "算法工程师", "产品经理", "数据分析师");
+        List<String> companies = Arrays.asList("阿里巴巴", "腾讯", "字节跳动", "华为", "美团");
+        List<String> sortOptions = Arrays.asList("hot", "latest", "mostCollected");
+
+        // ==================== 动态获取标签的核心逻辑 开始 ====================
+
+        // 2.1 从数据库查询所有帖子的tags JSON字符串列表
+        List<String> allTagsJsonList = experiencePostMapper.selectAllTagsJson();
+
+        // 2.2 在Java内存中解析、聚合、统计频率
+        // 将所有JSON数组字符串扁平化为一个包含所有标签的单一列表
+        List<String> flattenedTags = new ArrayList<>();
+        for (String tagsJson : allTagsJsonList) {
+            List<String> tags = objectMapper.readValue(tagsJson, new TypeReference<>() {});
+            flattenedTags.addAll(tags);
+        }
+
+        // 2.3 使用Stream API统计每个标签的出现次数
+        Map<String, Long> tagFrequencies = flattenedTags.stream()
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+
+        // 2.4 按频率降序排序，并提取标签名，最多返回前30个热门标签
+        List<String> popularTags = tagFrequencies.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(30)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        // ==================== 动态获取标签的核心逻辑 结束 ====================
+
+        // 3. 将中文键和对应的列表放入 Map
+        filterMap.put("工作类型", jobTypes);
+        filterMap.put("应聘岗位", positions);
+        filterMap.put("热门公司", companies);
+        filterMap.put("热门标签", popularTags); // 使用动态获取的热门标签
+        filterMap.put("排序方式", sortOptions);
+
+        return filterMap;
+    }
+
+    @Override
+    @SneakyThrows
     public Page<ExperiencePostVO> listExperiencePostsByPage(ExperiencePostQueryRequest queryRequest) {
         // 1. 创建MyBatis-Plus分页对象
         Page<ExperiencePostVO> page = new Page<>(queryRequest.getCurrent(), queryRequest.getPageSize());

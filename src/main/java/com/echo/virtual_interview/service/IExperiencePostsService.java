@@ -6,6 +6,7 @@ import com.echo.virtual_interview.model.entity.ExperiencePosts;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * <p>
@@ -55,4 +56,6 @@ public interface IExperiencePostsService extends IService<ExperiencePosts> {
      * @return 包含多个排行榜列表的响应对象
      */
     LeaderboardResponse getLeaderboards();
+
+    Map<String, Object> getExperienceFilterOptions();
 }

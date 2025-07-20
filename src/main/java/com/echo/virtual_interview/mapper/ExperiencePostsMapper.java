@@ -9,6 +9,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
 /**
  * <p>
  * 面经分享主表 Mapper 接口
@@ -25,4 +29,10 @@ public interface ExperiencePostsMapper extends BaseMapper<ExperiencePosts> {
      * @return 分页的VO结果
      */
     IPage<ExperiencePostVO> selectPostVOPage(Page<?> page, @Param("query") ExperiencePostQueryRequest query);
-}
+
+    /**
+     * 查询所有公开且已发布帖子的tags字段列表
+     * @return 包含tags JSON字符串的列表
+     */
+    @Select("SELECT tags FROM experience_posts WHERE status = 'PUBLISHED' AND visibility = 'PUBLIC' AND tags IS NOT NULL AND tags != '[]'")
+    List<String> selectAllTagsJson();}

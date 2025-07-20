@@ -7,6 +7,9 @@ spring:
   profiles:
     active: prod #设置去导入dev的生成环境配置信息
   # 支持 swagger3
+  cache:
+    # 明确告诉Spring Boot，我们想使用的缓存类型是Redis
+    type: redis
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher

@@ -13,6 +13,7 @@ import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 面经广场 API
@@ -36,7 +37,8 @@ public class ExperiencePostController {
         return ResultUtils.success(postId);
     }
     /**
-     * 1.2 在分享面试分析记录时，获取可选的、可展示/隐藏的报告模块列表
+     * 1.1 在创建面经的分享面试分析记录时，获取可选的的分析报告列表
+     * 目的是获取分析报告的sessionId
      * @return 可分享模块的列表
      */
     @GetMapping("/get/elements")
@@ -45,7 +47,7 @@ public class ExperiencePostController {
         return ResultUtils.success(elements);
     }
     /**
-     * 1.3. 在面试广场时，获取历史的面试记录 方便为发表的面经指定对应的面试
+     * 1.2 在面试广场时，创建面经时，获取历史的分析报告，方便为发表的面经指定对应的面试
      */
     @GetMapping("/history/list")
     public BaseResponse<List<InterviewHistoryDTO>> getHistory() {
@@ -53,9 +55,34 @@ public class ExperiencePostController {
         List<InterviewHistoryDTO> historyList = experiencePostService.getHistoryWithExperience(userId);
         return ResultUtils.success(historyList);
     }
-
     /**
-     * 3.获取面经详情
+     * 2.获取面经广场首页的排行榜数据
+     * @return 包含多个排行榜的聚合数据
+     */
+    @GetMapping("/get/leaderboard")
+    public BaseResponse<LeaderboardResponse> getLeaderboards() {
+        LeaderboardResponse leaderboards = experiencePostService.getLeaderboards();
+        return ResultUtils.success(leaderboards);
+    }
+    /**
+     * 3.1获取分类信息
+     */
+    @GetMapping("/filters")
+    public BaseResponse<Map<String, Object>> getExperienceFilterOptions() {
+        return ResultUtils.success(experiencePostService.getExperienceFilterOptions());
+    }
+    /**
+     * 3.2 分页获取面经列表
+     * @param queryRequest 包含分页、排序和筛选条件的请求体
+     * @return 分页的面经列表视图
+     */
+    @PostMapping("/list")
+    public BaseResponse<Page<ExperiencePostVO>> listPosts(@RequestBody ExperiencePostQueryRequest queryRequest) {
+        Page<ExperiencePostVO> pageResult = experiencePostService.listExperiencePostsByPage(queryRequest);
+        return ResultUtils.success(pageResult);
+    }
+    /**
+     * 4.获取面经详情
      * 获取该发布者的分析报告+面经详情、差评论区等
      * @param postId 面经的唯一ID
      * @return 包含完整信息的面经详情
@@ -66,27 +93,7 @@ public class ExperiencePostController {
         return ResultUtils.success(detail);
     }
     /**
-     * 4.获取面经广场首页的排行榜数据
-     * @return 包含多个排行榜的聚合数据
-     */
-    @GetMapping("/get/Header")
-    public BaseResponse<LeaderboardResponse> getLeaderboards() {
-        LeaderboardResponse leaderboards = experiencePostService.getLeaderboards();
-        return ResultUtils.success(leaderboards);
-    }
-    /**
-     * 5.分页获取面经列表
-     * @param queryRequest 包含分页、排序和筛选条件的请求体
-     * @return 分页的面经列表视图
-     */
-    @PostMapping("/list")
-    public BaseResponse<Page<ExperiencePostVO>> listPosts(@RequestBody ExperiencePostQueryRequest queryRequest) {
-        Page<ExperiencePostVO> pageResult = experiencePostService.listExperiencePostsByPage(queryRequest);
-        return ResultUtils.success(pageResult);
-    }
-    
-    /**
-     * 删除一篇面经
+     * 5.删除一篇面经
      * @param postId 面经的唯一ID
      * @return 操作成功响应
      */
