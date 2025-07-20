@@ -10,12 +10,19 @@
         p.likes_count,
         p.comments_count,
         p.is_anonymous,
+        p.created_at,
+        u.avatar_url,
         p.experience_url,
-        p.tags AS tagsJson, -- 将tags的JSON字符串查询出来，命名为tagsJson，方便Java层后续处理
+        p.tags AS tagsJson,
         u.nickname AS authorNickname,
         c.target_position AS position,
         c.target_company AS company,
-        c.job_type AS jobType
+        c.job_type AS jobType,
+        <!-- 新增：截取内容前30个字作为summary -->
+        CASE
+            WHEN LENGTH(p.content) > 30 THEN CONCAT(SUBSTRING(p.content, 1, 30), '...')
+            ELSE p.content
+        END AS summary
         FROM
         experience_posts p
         LEFT JOIN users u ON p.user_id = u.id

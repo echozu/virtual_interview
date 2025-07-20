@@ -2,6 +2,8 @@ package com.echo.virtual_interview.model.dto.experience;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -19,6 +21,19 @@ public class ExperiencePostVO {
      * 作者昵称
      */
     private String authorNickname;
+    /**
+     * 作者头像
+     */
+    private String avatarUrl;
+
+    /**
+     * 贴子的总结
+     */
+    private String summary;
+    /**
+     * 面经的创建时间
+     */
+    private LocalDateTime createdAt; // 创建时间
 
     /**
      * 标题

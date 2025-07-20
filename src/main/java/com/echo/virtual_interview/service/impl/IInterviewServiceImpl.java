@@ -266,7 +266,11 @@ public class IInterviewServiceImpl implements IInterviewService {
         // 创建会话ID
         String sessionId = String.format("%d-%s-%d",
                 userId, channelId, System.currentTimeMillis());
-
+        // 更新面试次数
+        InterviewChannels interviewChannels = interviewChannelMapper.selectById(channelId);
+        int newCount = interviewChannels.getUsageCount() + 1;
+        interviewChannels.setUsageCount(newCount);
+        interviewChannelMapper.updateById(interviewChannels);
         // 保存会话记录
         InterviewSessions session = new InterviewSessions()
                 .setId(sessionId)
