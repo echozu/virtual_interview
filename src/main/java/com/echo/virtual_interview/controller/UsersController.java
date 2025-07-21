@@ -13,12 +13,10 @@ import com.echo.virtual_interview.common.DeleteRequest;
 import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.common.ResultUtils;
 import com.echo.virtual_interview.constant.UserConstant;
+import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.exception.BusinessException;
 import com.echo.virtual_interview.exception.ThrowUtils;
-import com.echo.virtual_interview.model.dto.users.UserLoginRequest;
-import com.echo.virtual_interview.model.dto.users.UserQueryRequest;
-import com.echo.virtual_interview.model.dto.users.UserRegisterRequest;
-import com.echo.virtual_interview.model.dto.users.UserUpdateMyRequest;
+import com.echo.virtual_interview.model.dto.users.*;
 import com.echo.virtual_interview.model.entity.Users;
 import com.echo.virtual_interview.model.vo.LoginResultVO;
 import com.echo.virtual_interview.model.vo.LoginUserVO;
@@ -34,13 +32,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.DigestUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 用户接口
@@ -176,6 +170,16 @@ public class UsersController {
     }
 
 
+    /**
+     * 获取指定用户的面经统计数据
+     * @return ResponseEntity 包含 ExperienceStatsDTO
+     */
+    @GetMapping("/experience-stats")
+    public BaseResponse<ExperienceStatsDTO> getUserExperienceStats() {
+        Integer userId = UserIdContext.getUserIdContext();
+        ExperienceStatsDTO stats = userService.getExperienceStatsByUserId(Long.valueOf(userId));
+        return ResultUtils.success(stats);
+    }
 //    管理员相关的：创建用户、修改用户、删除用户等功能
 //
 //    /**

@@ -1,6 +1,7 @@
 package com.echo.virtual_interview.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.echo.virtual_interview.model.dto.users.ExperienceStatsDTO;
 import com.echo.virtual_interview.model.dto.users.UserQueryRequest;
 import com.echo.virtual_interview.model.entity.Users;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -110,4 +111,6 @@ public interface IUsersService extends IService<Users> {
      * @return
      */
     QueryWrapper<Users> getQueryWrapper(UserQueryRequest userQueryRequest);
+
+    ExperienceStatsDTO getExperienceStatsByUserId(Long userId);
 }

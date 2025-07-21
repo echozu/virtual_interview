@@ -3,6 +3,7 @@ package com.echo.virtual_interview.mapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.echo.virtual_interview.model.dto.experience.ExperiencePostQueryRequest;
 import com.echo.virtual_interview.model.dto.experience.ExperiencePostVO;
+import com.echo.virtual_interview.model.dto.users.ExperienceStatsDTO;
 import com.echo.virtual_interview.model.entity.ExperiencePosts;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -35,4 +36,19 @@ public interface ExperiencePostsMapper extends BaseMapper<ExperiencePosts> {
      * @return 包含tags JSON字符串的列表
      */
     @Select("SELECT tags FROM experience_posts WHERE status = 'PUBLISHED' AND visibility = 'PUBLIC' AND tags IS NOT NULL AND tags != '[]'")
-    List<String> selectAllTagsJson();}
+    List<String> selectAllTagsJson();
+
+    /**
+     * 根据用户ID计算该用户所有面经的总点赞数、总收藏数和总发布数
+     * @param userId 用户ID
+     * @return 包含总点赞数、总收藏数和总面经数的DTO对象
+     */
+    @Select("SELECT " +
+            "COALESCE(SUM(likes_count), 0) AS totalLikes, " +
+            "COALESCE(SUM(collections_count), 0) AS totalCollections, " +
+            "COUNT(id) AS totalPosts " +
+            "FROM experience_posts " +
+            "WHERE user_id = #{userId}")
+    ExperienceStatsDTO selectUserExperienceStats(@Param("userId") Long userId);
+
+}

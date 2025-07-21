@@ -285,7 +285,7 @@ public class AsrProcessingService {
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        log.warn("会话 {} 的音频发送任务被中断。", sessionId);
+                        log.warn("会话 {} 的音频发送被中断。", sessionId);
                     } catch (Exception e) {
                         log.error("会话 {} 的音频发送任务出现未知异常，将停止该任务。", sessionId, e);
                         ScheduledFuture<?> self = sendingTasks.get(sessionId);

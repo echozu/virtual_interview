@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.echo.virtual_interview.common.ErrorCode;
 import com.echo.virtual_interview.context.UserIdContext;
 import com.echo.virtual_interview.exception.BusinessException;
+import com.echo.virtual_interview.mapper.ExperienceCommentsMapper;
+import com.echo.virtual_interview.mapper.ExperiencePostsMapper;
+import com.echo.virtual_interview.model.dto.users.ExperienceStatsDTO;
 import com.echo.virtual_interview.model.dto.users.UserQueryRequest;
 import com.echo.virtual_interview.model.entity.Users;
 import com.echo.virtual_interview.mapper.UsersMapper;
@@ -13,6 +16,7 @@ import com.echo.virtual_interview.model.vo.LoginUserVO;
 import com.echo.virtual_interview.model.vo.UserVO;
 import com.echo.virtual_interview.service.IUsersService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -42,6 +46,10 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
      * 盐值，混淆密码
      */
     public static final String SALT = "echo";
+    @Resource
+    private ExperiencePostsMapper postsMapper;
+    @Resource
+    private ExperienceCommentsMapper commentsMapper;
 
     @Override
     public long userRegister(String userName, String userPassword, String checkPassword,String email) {
@@ -258,6 +266,27 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
                 sortField);*/
         return queryWrapper;
+    }
+
+    /**
+     * 获取指定用户的面经相关统计数据。
+     * 1. 从 experience_posts 表中聚合查询用户获得的总点赞数、总收藏数以及发布的总面经数。
+     * 2. 从 experience_comments 表中查询用户所有面经收到的总评论数。
+     * 3. 将这些数据整合到 ExperienceStatsDTO 中并返回。
+     *
+     * @param userId 要查询的用户ID
+     * @return 包含统计数据的DTO对象
+     */
+    @Override
+    public ExperienceStatsDTO getExperienceStatsByUserId(Long userId) {
+        // 1. 获取点赞、收藏、面经数
+        ExperienceStatsDTO statsDTO = postsMapper.selectUserExperienceStats(userId);
+
+        // 2. 获取评论数
+        Long totalComments = commentsMapper.countTotalCommentsByUserId(userId);
+        statsDTO.setTotalComments(totalComments);
+
+        return statsDTO;
     }
 
 
