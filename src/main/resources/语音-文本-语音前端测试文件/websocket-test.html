@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #4CAF50;
+        }
+
+        .status.disconnected {
+            background: #f44336;
+        }
+
+        .status.connecting {
+            background: #ff9800;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .message-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message-history {
+            height: 400px;
+            overflow-y: auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: white;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+
+        .message.sent {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+        }
+
+        .message.received {
+            background: #e8f5e8;
+            border-left-color: #4caf50;
+        }
+
+        .message.error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .message.system {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .message-content {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .quick-action {
+            background: #e0e0e0;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .quick-action:hover {
+            background: #d0d0d0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WebSocket 测试工具</h1>
+            <div class="status disconnected" id="connectionStatus">未连接</div>
+        </div>
+
+        <div class="main-content">
+            <div class="control-panel">
+                <h3>连接控制</h3>
+                
+                <div class="form-group">
+                    <label for="wsUrl">WebSocket URL:</label>
+                    <input type="text" id="wsUrl" value="ws://localhost:9527/ws/interview" placeholder="输入WebSocket地址">
+                </div>
+
+                <div class="form-group">
+                    <label for="userId">用户ID:</label>
+                    <input type="text" id="userId" value="1" placeholder="输入用户ID">
+                </div>
+
+                <div class="form-group">
+                    <label for="subscribeUrl">订阅地址:</label>
+                    <input type="text" id="subscribeUrl" value="/user/1/queue/interview/answer" placeholder="订阅地址">
+                </div>
+
+                <div class="form-group">
+                    <label for="tokenInput">JWT Token:</label>
+                    <input type="text" id="tokenInput" placeholder="输入JWT Token">
+                </div>
+
+                <button id="connectBtn" onclick="connect()">连接</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>断开连接</button>
+                <button onclick="clearMessages()">清空消息</button>
+
+                <h3 style="margin-top: 20px;">发送消息</h3>
+                
+                <div class="form-group">
+                    <label for="sessionId">会话ID:</label>
+                    <input type="text" id="sessionId" value="test-session-123" placeholder="输入会话ID">
+                </div>
+
+                <div class="form-group">
+                    <label for="messageContent">消息内容:</label>
+                    <textarea id="messageContent" rows="3" placeholder="输入要发送的消息"></textarea>
+                </div>
+
+                <button onclick="sendMessage()" id="sendBtn" disabled>发送消息</button>
+
+                <div class="quick-actions">
+                    <div class="quick-action" onclick="quickSend('你好')">你好</div>
+                    <div class="quick-action" onclick="quickSend('测试消息')">测试消息</div>
+                    <div class="quick-action" onclick="quickSend('连接测试')">连接测试</div>
+                    <div class="quick-action" onclick="quickSend('再见')">再见</div>
+                </div>
+            </div>
+
+            <div class="message-panel">
+                <h3>消息记录</h3>
+                <div class="message-history" id="messageHistory"></div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="autoScroll" checked> 自动滚动到底部
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入必要的库 -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+
+    <script>
+        let socket = null;
+        let stompClient = null;
+        let isConnected = false;
+
+        // 更新连接状态
+        function updateConnectionStatus(status, text) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = text;
+        }
+
+        // 添加消息到历史记录
+        function addMessage(type, content, sender = '') {
+            const messageHistory = document.getElementById('messageHistory');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            const senderText = sender ? `[${sender}] ` : '';
+            
+            messageDiv.innerHTML = `
+                <div class="message-time">${time}</div>
+                <div class="message-content">${senderText}${content}</div>
+            `;
+            
+            messageHistory.appendChild(messageDiv);
+            
+            // 自动滚动到底部
+            if (document.getElementById('autoScroll').checked) {
+                messageHistory.scrollTop = messageHistory.scrollHeight;
+            }
+        }
+
+        // 连接WebSocket
+        function connect() {
+            const wsUrl = document.getElementById('wsUrl').value;
+            const token = document.getElementById('tokenInput').value;
+            const userId = document.getElementById('userId').value;
+            const subscribeUrl = document.getElementById('subscribeUrl').value;
+
+            if (!wsUrl) {
+                alert('请输入WebSocket地址');
+                return;
+            }
+            if (!token) {
+                alert('请输入JWT Token');
+                return;
+            }
+
+            updateConnectionStatus('connecting', '连接中...');
+            addMessage('system', `正在连接到: ${wsUrl}`);
+
+            try {
+                // 直接使用WebSocket连接，不使用SockJS
+                socket = new WebSocket(wsUrl);
+                stompClient = Stomp.over(socket);
+                
+                // 添加连接时的headers
+                const headers = {
+                    'Authorization': `Bearer ${token}`
+                };
+
+                // 禁用调试信息（可选）
+                stompClient.debug = function(str) {
+                    console.log(str);
+                };
+
+                stompClient.connect(headers, function (frame) {
+                    isConnected = true;
+                    updateConnectionStatus('connected', '已连接');
+                    addMessage('system', '连接成功!');
+                    addMessage('system', `Frame: ${frame}`);
+                    
+                    // 启用/禁用按钮
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
+
+                    // 订阅消息
+                    if (subscribeUrl) {
+                        stompClient.subscribe(subscribeUrl, function (message) {
+                            try {
+                                const parsedMessage = JSON.parse(message.body);
+                                addMessage('received', JSON.stringify(parsedMessage, null, 2), 'assistant');
+                            } catch (e) {
+                                addMessage('received', message.body, 'Server');
+                            }
+                        });
+                        addMessage('system', `已订阅: ${subscribeUrl}`);
+                    }
+
+                }, function (error) {
+                    isConnected = false;
+                    updateConnectionStatus('disconnected', '连接失败');
+                    addMessage('error', `连接失败: ${error}`);
+                    
+                    // 重置按钮状态
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    document.getElementById('sendBtn').disabled = true;
+                });
+
+            } catch (error) {
+                updateConnectionStatus('disconnected', '连接错误');
+                addMessage('error', `连接错误: ${error.message}`);
+            }
+        }
+
+        // 断开连接
+        function disconnect() {
+            if (stompClient && isConnected) {
+                stompClient.disconnect(function() {
+                    isConnected = false;
+                    updateConnectionStatus('disconnected', '已断开');
+                    addMessage('system', '连接已断开');
+                    
+                    // 重置按钮状态
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    document.getElementById('sendBtn').disabled = true;
+                });
+            }
+        }
+
+        // 发送消息
+        function sendMessage() {
+            if (!stompClient || !isConnected) {
+                alert('请先连接WebSocket');
+                return;
+            }
+            
+            const token = document.getElementById('tokenInput').value;
+            if (!token) {
+                alert('请输入JWT Token');
+                return;
+            }
+            
+            const sessionId = document.getElementById('sessionId').value;
+            const content = document.getElementById('messageContent').value;
+
+            if (!sessionId || !content) {
+                alert('请输入会话ID和消息内容');
+                return;
+            }
+
+            // 添加发送时的headers
+            const headers = {
+                'Authorization': `Bearer ${token}`
+            };
+            
+            // 构造消息对象，匹配后端的ChatMessage格式
+            const message = {
+                sender: "user",
+                content: content
+            };
+
+            try {
+                // 发送到 /api/interview/process/{sessionId}
+                const destination = `/api/interview/process/${sessionId}`;
+                stompClient.send(destination, headers, JSON.stringify(message));
+                addMessage('sent', JSON.stringify(message, null, 2), 'User');
+                
+                // 清空输入框
+                document.getElementById('messageContent').value = '';
+            } catch (error) {
+                addMessage('error', `发送失败: ${error.message}`);
+            }
+        }
+
+        // 快速发送
+        function quickSend(content) {
+            document.getElementById('messageContent').value = content;
+            sendMessage();
+        }
+
+        // 清空消息
+        function clearMessages() {
+            document.getElementById('messageHistory').innerHTML = '';
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 回车发送消息
+            document.getElementById('messageContent').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // 添加欢迎消息
+            addMessage('system', '欢迎使用WebSocket测试工具！请配置连接参数后点击连接。');
+        });
+
+        // 页面关闭时断开连接
+        window.addEventListener('beforeunload', function() {
+            if (stompClient && isConnected) {
+                stompClient.disconnect();
+            }
+        });
+    </script>
+</body>
+</html>

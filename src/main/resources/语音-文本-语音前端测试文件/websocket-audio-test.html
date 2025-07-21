@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 音频流测试页面（讯飞ASR+TTS版）- 流式音频播放</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #4CAF50;
+        }
+
+        .status.disconnected {
+            background: #f44336;
+        }
+
+        .status.connecting {
+            background: #ff9800;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .panel {
+            flex: 1;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message-history {
+            height: 350px;
+            overflow-y: auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: white;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+
+        .message.sent {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+        }
+
+        .message.received {
+            background: #e8f5e8;
+            border-left-color: #4caf50;
+        }
+
+        .message.error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .message.system {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+
+        .message.warn {
+            background: #fff8e1;
+            border-left-color: #ffc107;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .message-content {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WebSocket 音频流测试工具（讯飞ASR+TTS版）- 流式音频播放</h1>
+            <div class="status disconnected" id="connectionStatus">未连接</div>
+            <div class="status disconnected" id="audioStatus" style="margin-left: 10px;">音频未播放</div>
+        </div>
+        <div class="main-content">
+            <div class="panel">
+                <h3>连接参数</h3>
+                <div class="form-group">
+                    <label for="wsUrl">WebSocket URL:</label>
+                    <input type="text" id="wsUrl" value="http://localhost:9527/ws/interview"
+                        placeholder="输入WebSocket地址">
+                </div>
+                <div class="form-group">
+                    <label for="tokenInput">JWT Token:</label>
+                    <input type="text" id="tokenInput"
+                        value="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJlY2hvIiwiaWF0IjoxNzUwOTI3NDA5LCJleHAiOjE3NTEwMTM4MDl9.sv5M17Nw6I1j0gckqo2SHdWGixAjTONJ8GHQoQTcJPY"
+                        placeholder="输入JWT Token">
+                </div>
+                <div class="form-group">
+                    <label for="userId">用户ID:</label>
+                    <input type="text" id="userId" value="1" placeholder="输入用户ID">
+                </div>
+                <div class="form-group">
+                    <label for="sessionId">会话ID (sessionId):</label>
+                    <input type="text" id="sessionId" value="1-10-1751005261429" placeholder="输入会话ID">
+                </div>
+                <button id="connectBtn" onclick="connect()">连接</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>断开连接</button>
+            </div>
+            <div class="panel">
+                <h3>音频流与控制</h3>
+                <div class="form-group">
+                    <button onclick="startRecording()" id="recordBtn" disabled>开始录音并发送音频流</button>
+                    <button onclick="stopRecording()" id="stopRecordBtn" disabled>停止录音</button>
+                </div>
+                <div class="form-group">
+                    <button onclick="downloadRecording()" id="downloadBtn" disabled
+                        style="background: #4caf50;">下载录音为WAV</button>
+                    <button onclick="clearMessages()">清空消息</button>
+                </div>
+                <div class="form-group">
+                    <button onclick="stopAudioPlayback()" id="stopAudioBtn" disabled
+                        style="background: #f44336;">停止AI语音播放</button>
+                    <button onclick="clearAudioQueue()" id="clearAudioBtn" disabled
+                        style="background: #ff9800;">清空音频队列</button>
+                    <button onclick="testAudioPlayback()" id="testAudioBtn" style="background: #9c27b0;">测试音频播放</button>
+                    <button onclick="simulateBackendAudio()" id="simulateBtn"
+                        style="background: #607d8b;">模拟后端音频</button>
+                </div>
+                <h3>消息记录</h3>
+                <div class="message-history" id="messageHistory"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <script>
+        let stompClient = null;
+        let isConnected = false;
+        let sessionId = '';
+        let userId = '';
+        let socket = null; // 仅用于兼容旧变量名
+
+        // 【新增】连接状态监控
+        let connectionCheckInterval = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 3;
+
+        // 录音相关变量
+        let audioContext = null;
+        let mediaStreamSource = null;
+        let workletNode = null;
+        let audioStream = null;
+        let audioDataBuffer = [];
+        let isRecording = false;
+        let sendIntervalId = null;
+
+        // 【新增】用于存储所有录制的音频块（用于下载）
+        let recordedPcmChunks = [];
+
+        // 【新增】音频播放相关变量
+        let audioQueue = [];
+        let isPlaying = false;
+        let audioBuffer = null;
+        let currentSource = null;
+        let audioStartTime = 0;
+        let audioOffset = 0;
+
+        // 讯飞推荐的发送参数
+        const chunkSize = 1280; // 1280 字节
+        const sendInterval = 40; // 40 毫秒
+
+        // 【新增】一个将ArrayBuffer转换为Base64的辅助函数
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+
+        function updateConnectionStatus(status, text) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = text;
+        }
+
+        function updateAudioStatus(status, text) {
+            const statusElement = document.getElementById('audioStatus');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = text;
+        }
+
+        function addMessage(type, content, sender = '') {
+            const messageHistory = document.getElementById('messageHistory');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            const time = new Date().toLocaleTimeString();
+            const senderText = sender ? `[${sender}] ` : '';
+            messageDiv.innerHTML = `<div class="message-time">${time}</div><div class="message-content">${senderText}${content}</div>`;
+            messageHistory.appendChild(messageDiv);
+            messageHistory.scrollTop = messageHistory.scrollHeight;
+        }
+
+        function connect() {
+            const rawWsUrl = document.getElementById('wsUrl').value;
+            const wsUrl = rawWsUrl.replace(/^http/, 'ws');
+            const token = document.getElementById('tokenInput').value;
+            userId = document.getElementById('userId').value;
+            sessionId = document.getElementById('sessionId').value;
+
+            if (!wsUrl || !token || !userId || !sessionId) {
+                alert('请填写所有连接参数');
+                return;
+            }
+
+            updateConnectionStatus('connecting', '连接中...');
+            addMessage('system', `正在连接到: ${wsUrl}`);
+
+            // 断开旧连接
+            if (stompClient && stompClient.active) {
+                stompClient.deactivate();
+            }
+
+            // 创建新的 STOMP 客户端
+            stompClient = new StompJs.Client({
+                brokerURL: wsUrl,
+                connectHeaders: {
+                    Authorization: `Bearer ${token}`,
+                },
+                publishHeaders: {
+                    Authorization: `Bearer ${token}`
+                },
+                debug: function (str) {
+                    console.log('[STOMP]', str);
+                },
+                reconnectDelay: 3000,
+                heartbeatIncoming: 10000,
+                heartbeatOutgoing: 10000
+            });
+
+            stompClient.onConnect = function (frame) {
+                isConnected = true;
+                reconnectAttempts = 0;
+                updateConnectionStatus('connected', '已连接');
+                addMessage('system', '连接成功!');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('recordBtn').disabled = false;
+                document.getElementById('stopAudioBtn').disabled = false;
+                document.getElementById('clearAudioBtn').disabled = false;
+                startConnectionMonitoring();
+              
+
+                // 订阅AI音频流
+                stompClient.subscribe('/user/queue/interview/audio.reply', function (message) {
+                    try {
+                        console.log('[WebSocket] 收到AI音频消息:', message.body);
+                        const parsed = JSON.parse(message.body);
+                        addMessage('received', `收到音频数据块: ${parsed.isFinal ? '最终块' : '数据块'}`, 'AI');
+                        audioPlayerManager.handleAudioResponse(parsed);
+                        if (parsed.isFinal) {
+                            addMessage('system', 'AI语音播放完成');
+                        }
+                    } catch (e) {
+                        addMessage('received', message.body, 'AI');
+                        console.error('[WebSocket] 解析AI音频消息失败:', e, message.body);
+                    }
+                });
+                // 订阅用户实时转写文本
+                stompClient.subscribe('/user/queue/interview/transcript.user', function (message) {
+                    try {
+                        const parsed = JSON.parse(message.body);
+                        // 现在格式为 { sender: 'user', content: '...' }
+                        addMessage('sent', parsed.content, parsed.sender === 'user' ? '用户转写' : parsed.sender);
+                    } catch (e) {
+                        addMessage('error', '用户转写解析失败: ' + e.message);
+                    }
+                });
+
+                // 订阅AI实时回复文本
+                stompClient.subscribe('/user/queue/interview/transcript.assistant', function (message) {
+                    try {
+                        const parsed = JSON.parse(message.body);
+                        // 现在格式为 { sender: 'assistant', content: '...' }
+                        addMessage('received', parsed.content, parsed.sender === 'assistant' ? 'AI转写' : parsed.sender);
+                    } catch (e) {
+                        addMessage('error', 'AI转写解析失败: ' + e.message);
+                    }
+                });
+            };
+
+            stompClient.onStompError = function (frame) {
+                isConnected = false;
+                updateConnectionStatus('disconnected', 'STOMP错误');
+                addMessage('error', 'STOMP错误: ' + frame.headers['message']);
+                document.getElementById('connectBtn').disabled = false;
+                stopConnectionMonitoring();
+            };
+
+            stompClient.onWebSocketError = function (event) {
+                isConnected = false;
+                updateConnectionStatus('disconnected', 'WebSocket错误');
+                addMessage('error', 'WebSocket错误: ' + event);
+                document.getElementById('connectBtn').disabled = false;
+                stopConnectionMonitoring();
+            };
+
+            stompClient.onDisconnect = function () {
+                isConnected = false;
+                updateConnectionStatus('disconnected', '已断开');
+                addMessage('system', '连接已断开');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('recordBtn').disabled = true;
+                document.getElementById('stopRecordBtn').disabled = true;
+                document.getElementById('downloadBtn').disabled = true;
+                document.getElementById('stopAudioBtn').disabled = true;
+                document.getElementById('clearAudioBtn').disabled = true;
+                stopConnectionMonitoring();
+            };
+
+            stompClient.activate();
+        }
+
+        function disconnect() {
+            if (isRecording) {
+                stopRecording();
+            }
+            if (stompClient && stompClient.active) {
+                stompClient.deactivate();
+            }
+            isConnected = false;
+            updateConnectionStatus('disconnected', '已断开');
+            addMessage('system', '连接已断开');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('recordBtn').disabled = true;
+            document.getElementById('stopRecordBtn').disabled = true;
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('stopAudioBtn').disabled = true;
+            document.getElementById('clearAudioBtn').disabled = true;
+            stopConnectionMonitoring();
+        }
+
+        async function startRecording() {
+            if (!stompClient || !stompClient.connected) {
+                addMessage('error', '连接已断开，无法开始录音。请重新连接。');
+                return;
+            }
+
+            if (isRecording) {
+                console.warn("已经在录音中。");
+                return;
+            }
+
+            // 每次开始录音时，清空缓冲区
+            audioDataBuffer = [];
+            // 每次开始录音时，清空上一次的录音数据
+            recordedPcmChunks = [];
+            document.getElementById('downloadBtn').disabled = true;
+
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                addMessage('system', '获取麦克风成功，正在初始化AudioWorklet...');
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // 【改动】加载独立的 Worklet 脚本文件
+                addMessage('system', '正在加载 AudioWorklet 模块...');
+                try {
+                    await audioContext.audioWorklet.addModule('./recorder.worklet.js');
+                    addMessage('system', 'AudioWorklet 模块加载成功！');
+                } catch (workletError) {
+                    addMessage('error', `AudioWorklet 模块加载失败: ${workletError.message}`);
+                    addMessage('system', '尝试使用备用路径...');
+                    try {
+                        await audioContext.audioWorklet.addModule('./recorder.worklet.js');
+                        addMessage('system', '使用备用路径加载成功！');
+                    } catch (backupError) {
+                        addMessage('error', `备用路径也失败: ${backupError.message}`);
+                        addMessage('system', '请确保通过 HTTP 服务器访问此页面，而不是直接打开文件');
+                        throw new Error('AudioWorklet 模块无法加载，请检查文件路径和服务器设置');
+                    }
+                }
+
+                const mediaStreamSource = audioContext.createMediaStreamSource(audioStream);
+
+                // 【改动】创建 AudioWorkletNode 实例
+                workletNode = new AudioWorkletNode(audioContext, 'recorder-processor', {
+                    processorOptions: {
+                        sourceSampleRate: audioContext.sampleRate
+                    }
+                });
+
+                // 【改动】设置消息监听，从 Worklet 的后台线程接收处理好的PCM数据
+                workletNode.port.onmessage = (event) => {
+                    // event.data 是一个 ArrayBuffer
+                    // console.log(`收到来自Worklet的PCM数据，大小: ${event.data.byteLength} bytes`);
+                    audioDataBuffer.push(new Uint8Array(event.data));
+
+                    // 将当前PCM块存入数组，用于后续下载
+                    const pcmData = new Int16Array(event.data);
+                    recordedPcmChunks.push(pcmData);
+                };
+
+                // 连接音频图：原始流 -> Worklet节点
+                mediaStreamSource.connect(workletNode);
+                // Worklet节点无需连接到 destination，因为它只处理数据，不发声
+
+                // 启动定时发送器
+                sendIntervalId = setInterval(sendAudioChunk, sendInterval);
+
+                isRecording = true;
+                document.getElementById('recordBtn').disabled = true;
+                document.getElementById('stopRecordBtn').disabled = false;
+                addMessage('system', `录音已开始 (AudioWorklet模式)`);
+
+                // 【新增】录音开始后，请求AI开场白语音
+                addMessage('system', '正在请求AI开场白语音...');
+                const token = document.getElementById('tokenInput').value;
+                const apiUrl = `http://localhost:9527/api/interview/process/start/greeting-audio?sessionId=${sessionId}&userId=${userId}`;
+                fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        addMessage('system', '开场白语音请求已成功发送，请等待WebSocket推送音频。');
+                    } else {
+                        addMessage('error', `请求开场白语音失败，状态: ${response.status}`);
+                    }
+                })
+                .catch(error => {
+                    addMessage('error', `请求开场白语音时发生网络错误: ${error.message}`);
+                });
+
+            } catch (err) {
+                addMessage('error', '初始化录音失败: ' + err.message);
+                console.error('录音初始化错误:', err);
+
+                // 提供更详细的错误信息
+                if (err.name === 'NotSupportedError') {
+                    addMessage('system', '提示：请确保通过 HTTP 服务器访问此页面，而不是直接打开文件');
+                    addMessage('system', '可以使用命令：python -m http.server 8080 启动本地服务器');
+                }
+            }
+        }
+
+        // 【修改】更新此函数以发送Base64编码的JSON
+        function sendAudioChunk() {
+            if (!isRecording || !stompClient || !stompClient.connected) {
+                addMessage('error', '连接已断开，自动停止录音。');
+                stopRecording();
+                return;
+            }
+
+            if (audioDataBuffer.length === 0) {
+                return;
+            }
+
+            // 1. 合并当前间隔内收集到的所有小数据块
+            const blob = new Blob(audioDataBuffer);
+            audioDataBuffer = []; // 发送后立即清空缓冲区
+
+            const token = document.getElementById('tokenInput').value;
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'content-type': 'application/json' // 明确内容类型为JSON
+            };
+
+            // 2. 将合并后的Blob转为ArrayBuffer，然后进行Base64编码
+            blob.arrayBuffer().then(arrayBuffer => {
+                if (arrayBuffer.byteLength > 0) {
+                    const base64Audio = arrayBufferToBase64(arrayBuffer);
+                    // 3. 构建JSON载荷
+                    const payload = JSON.stringify({ audio: base64Audio });
+
+                    try {
+                        // 4. 发送JSON字符串
+                        stompClient.publish({
+                            destination: `/api/interview/process/audio/tts/${sessionId}`,
+                            headers: headers,
+                            body: payload
+                        });
+                    } catch (error) {
+                        addMessage('error', `音频块发送失败: ${error.message}`);
+                        stopRecording();
+                    }
+                }
+            });
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false; // 立即设置状态，防止重入
+            const token = document.getElementById('tokenInput').value;
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'content-type': 'application/json' // 明确内容类型为JSON
+            };            // 【核心修复】停止定时发送器
+            if (sendIntervalId) {
+                clearInterval(sendIntervalId);
+                sendIntervalId = null;
+            }
+
+            // 【增强】检查连接状态，再尝试发送最后的数据和结束信号
+            if (stompClient && stompClient.connected) {
+                // 发送最后剩余的数据
+                sendAudioChunk();
+
+                // 延迟一小段时间再发送结束信号，确保最后的数据包已发出
+                setTimeout(() => {
+                    if (stompClient && stompClient.connected) {
+                        addMessage('system', '发送音频结束信号...');
+                        stompClient.publish({
+                            destination: `/api/interview/process/audio/end/${sessionId}`,
+                            headers: headers,
+                        });
+                    }
+                }, 200);
+            } else {
+                addMessage('warn', '连接已断开，无法发送结束信号。');
+            }
+
+            // 清理音频资源
+            if (workletNode) {
+                workletNode.port.close();
+                workletNode.disconnect();
+                workletNode = null;
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            if (audioContext) {
+                audioContext.close().then(() => audioContext = null);
+            }
+
+            addMessage('system', '录音已停止');
+            document.getElementById('recordBtn').disabled = false;
+            document.getElementById('stopRecordBtn').disabled = true;
+
+            // 【新增】录音停止后，激活下载按钮
+            if (recordedPcmChunks.length > 0) {
+                document.getElementById('downloadBtn').disabled = false;
+            }
+        }
+
+        // 下载WAV文件的功能
+        function downloadRecording() {
+            if (recordedPcmChunks.length === 0) {
+                alert('没有录音数据可供下载。');
+                return;
+            }
+
+            // 1. 合并所有PCM块
+            const totalLength = recordedPcmChunks.reduce((acc, val) => acc + val.length, 0);
+            const fullPcm = new Int16Array(totalLength);
+            let offset = 0;
+            for (const chunk of recordedPcmChunks) {
+                fullPcm.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            // 2. 创建WAV文件
+            const wavBlob = createWavBlob(fullPcm, 16000);
+
+            // 3. 创建下载链接并触发点击
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style = 'display: none';
+            a.href = url;
+            a.download = `recording_${sessionId}_${new Date().toISOString()}.wav`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            addMessage('system', 'WAV文件已开始下载。');
+        }
+
+        // 创建WAV文件的辅助函数
+        function createWavBlob(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            const dataSize = pcmData.length * (bitsPerSample / 8);
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+
+            // "fmt " sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size for PCM
+            view.setUint16(20, 1, true); // AudioFormat 1 for PCM
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+
+            // "data" sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write PCM data
+            let offset = 44;
+            for (let i = 0; i < pcmData.length; i++, offset += 2) {
+                view.setInt16(offset, pcmData[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function clearMessages() {
+            document.getElementById('messageHistory').innerHTML = '';
+        }
+
+        // 页面关闭时断开连接
+        window.addEventListener('beforeunload', function () {
+            if (isRecording) {
+                stopRecording();
+            }
+            disconnect();
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            addMessage('system', '欢迎使用WebSocket音频流测试工具（讯飞ASR+TTS版）- 流式音频播放！请配置参数后连接。');
+            updateAudioStatus('disconnected', '音频未播放');
+            addMessage('system', '提示：首次播放音频时，浏览器可能需要用户交互才能自动播放。');
+        });
+
+        // 【新增】连接状态监控函数
+        function startConnectionMonitoring() {
+            if (connectionCheckInterval) {
+                clearInterval(connectionCheckInterval);
+            }
+
+            connectionCheckInterval = setInterval(() => {
+                if (stompClient && !stompClient.connected && isConnected) {
+                    addMessage('warn', '检测到连接断开，正在尝试重连...');
+                    isConnected = false;
+                    updateConnectionStatus('connecting', '重连中...');
+
+                    if (isRecording) {
+                        stopRecording();
+                    }
+
+                    // 尝试重连
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        addMessage('system', `第 ${reconnectAttempts} 次重连尝试...`);
+                        setTimeout(() => {
+                            connect();
+                        }, 1000 * reconnectAttempts); // 递增延迟
+                    } else {
+                        addMessage('error', '重连失败，请手动重新连接');
+                        updateConnectionStatus('disconnected', '连接失败');
+                        stopConnectionMonitoring();
+                    }
+                }
+            }, 2000); // 每2秒检查一次
+        }
+
+        // 【新增】停止连接监控
+        function stopConnectionMonitoring() {
+            if (connectionCheckInterval) {
+                clearInterval(connectionCheckInterval);
+                connectionCheckInterval = null;
+            }
+            reconnectAttempts = 0;
+        }
+
+        // ========== AudioPlayerManager ========== //
+        class AudioPlayerManager {
+            constructor() {
+                this.audioQueue = [];
+                this.isPlaying = false;
+                this.isStreamFinished = false;
+                this.mediaSource = null;
+                this.sourceBuffer = null;
+                this.audioElement = null;
+                this._init();
+            }
+
+            _init() {
+                // 清理旧的audio元素
+                if (this.audioElement) {
+                    this.audioElement.pause();
+                    this.audioElement.src = '';
+                    this.audioElement.remove();
+                }
+                this.audioElement = document.createElement('audio');
+                this.audioElement.controls = true;
+                this.audioElement.style.display = 'none';
+                document.body.appendChild(this.audioElement);
+
+                this.mediaSource = new MediaSource();
+                this.audioElement.src = URL.createObjectURL(this.mediaSource);
+                this.isPlaying = false;
+                this.isStreamFinished = false;
+                this.audioQueue = [];
+                this.sourceBuffer = null;
+
+                this.mediaSource.addEventListener('sourceopen', () => {
+                    console.log('[AudioPlayerManager] mediaSource opened');
+                    if (!MediaSource.isTypeSupported('audio/mpeg')) {
+                        addMessage('error', '浏览器不支持audio/mpeg (MP3)');
+                        console.error('[AudioPlayerManager] audio/mpeg not supported');
+                        return;
+                    }
+                    this.sourceBuffer = this.mediaSource.addSourceBuffer('audio/mpeg');
+                    this.sourceBuffer.mode = 'sequence';
+                    this.sourceBuffer.addEventListener('updateend', () => {
+                        console.log('[AudioPlayerManager] sourceBuffer updateend, queue length:', this.audioQueue.length);
+                        this._playNextChunk();
+                    });
+                    // 如果队列有数据，立即尝试播放
+                    if (this.audioQueue.length > 0) {
+                        console.log('[AudioPlayerManager] sourceopen: queue not empty, playNextChunk');
+                        this._playNextChunk();
+                    }
+                });
+            }
+
+            handleAudioResponse(response) {
+                console.log('[AudioPlayerManager] handleAudioResponse:', response);
+                // 处理AI音频下行消息
+                if (response.isFinal) {
+                    console.log(`[AudioPlayerManager] Received FINAL signal at ${new Date().toLocaleTimeString()}`);
+                    this.isStreamFinished = true;
+                }
+                if (response.audio) {
+                    console.log(`[AudioPlayerManager] Received audio chunk. Queue length will be: ${this.audioQueue.length + 1}`);
+                    // Base64解码为ArrayBuffer
+                    try {
+                        const audioBuffer = this._base64ToArrayBuffer(response.audio);
+                        this.audioQueue.push(audioBuffer);
+                    } catch (e) {
+                        console.error('[AudioPlayerManager] Base64 decode error:', e, response.audio);
+                        addMessage('error', 'Base64解码音频数据失败: ' + e.message);
+                    }
+                }
+                // 只要有数据且未在播放，尝试播放
+                if (!this.isPlaying && this.sourceBuffer && !this.sourceBuffer.updating) {
+                    console.log('[AudioPlayerManager] Not playing, try playNextChunk');
+                    this._playNextChunk();
+                }
+            }
+
+            _playNextChunk() {
+                if (!this.sourceBuffer || this.sourceBuffer.updating) {
+                    console.log('[AudioPlayerManager] _playNextChunk: sourceBuffer busy or not ready');
+                    return;
+                }
+                if (this.audioQueue.length > 0) {
+                    this.isPlaying = true;
+                    const buffer = this.audioQueue.shift();
+                    try {
+                        console.log('[AudioPlayerManager] Appending buffer, remaining queue:', this.audioQueue.length);
+                        this.sourceBuffer.appendBuffer(buffer);
+                        this.audioElement.play().then(() => {
+                            console.log('[AudioPlayerManager] audioElement.play() success');
+                        }).catch((e) => {
+                            console.warn('[AudioPlayerManager] audioElement.play() failed:', e);
+                        });
+                    } catch (e) {
+                        addMessage('error', '追加音频数据失败: ' + e.message);
+                        console.error('[AudioPlayerManager] appendBuffer error:', e);
+                    }
+                } else {
+                    this.isPlaying = false;
+                    // 队列空了，如果流结束，关闭mediaSource
+                    if (this.isStreamFinished && this.mediaSource.readyState === 'open') {
+                        try {
+                            this.mediaSource.endOfStream();
+                            console.log('[AudioPlayerManager] endOfStream called');
+                        } catch (e) {
+                            // 可能已关闭
+                            console.warn('[AudioPlayerManager] endOfStream error:', e);
+                        }
+                        addMessage('system', 'AI语音播放已全部结束');
+                    } else {
+                        console.log('[AudioPlayerManager] _playNextChunk: queue empty, stream not finished');
+                    }
+                }
+            }
+
+            reset() {
+                console.log('[AudioPlayerManager] reset called');
+                // 彻底重置播放器
+                if (this.audioElement) {
+                    this.audioElement.pause();
+                    this.audioElement.src = '';
+                    this.audioElement.remove();
+                }
+                if (this.mediaSource) {
+                    try { this.mediaSource.endOfStream(); } catch (e) { }
+                }
+                this._init();
+                addMessage('system', '音频播放器已重置');
+            }
+
+            _base64ToArrayBuffer(base64) {
+                try {
+                    const binary = atob(base64);
+                    const len = binary.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    return bytes.buffer;
+                } catch (e) {
+                    console.error('[AudioPlayerManager] atob error:', e, base64);
+                    throw e;
+                }
+            }
+        }
+
+        // ========== 全局播放器实例 ==========
+        let audioPlayerManager = new AudioPlayerManager();
+
+        // 【新增】停止音频播放
+        function stopAudioPlayback() {
+            if (audioPlayerManager) {
+                audioPlayerManager.reset();
+            }
+            addMessage('system', 'AI语音播放已停止');
+        }
+
+        // 【新增】清空音频队列
+        function clearAudioQueue() {
+            if (audioPlayerManager) {
+                audioPlayerManager.reset();
+            }
+            addMessage('system', '待播放的音频队列已清空');
+        }
+
+        // 【新增】测试音频播放功能
+        function testAudioPlayback() {
+            addMessage('system', '开始测试音频播放功能...');
+
+            // 创建一个简单的测试音频（1秒的440Hz正弦波）
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const sampleRate = 16000;
+            const duration = 1; // 1秒
+            const frequency = 440; // 440Hz
+
+            const audioBuffer = audioContext.createBuffer(1, sampleRate * duration, sampleRate);
+            const channelData = audioBuffer.getChannelData(0);
+
+            for (let i = 0; i < channelData.length; i++) {
+                channelData[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.3;
+            }
+
+            // 将AudioBuffer转换为PCM数据
+            const pcmData = new Int16Array(channelData.length);
+            for (let i = 0; i < channelData.length; i++) {
+                pcmData[i] = Math.round(channelData[i] * 32767);
+            }
+
+            // 转换为Base64
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+
+            // 测试播放
+            audioPlayerManager.handleAudioResponse({ audio: base64Audio, isFinal: false });
+
+            addMessage('system', '测试音频已发送到播放器');
+        }
+
+        // 【新增】模拟接收后端音频数据
+        function simulateBackendAudio() {
+            addMessage('system', '模拟接收后端音频数据...');
+
+            // 模拟后端发送的AudioResponseDto格式
+            const mockAudioResponse = {
+                audio: "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",
+                isFinal: false
+            };
+
+            // 模拟WebSocket消息
+            const mockMessage = {
+                body: JSON.stringify(mockAudioResponse)
+            };
+
+            // 手动触发消息处理
+            try {
+                const parsed = JSON.parse(mockMessage.body);
+                addMessage('received', `模拟音频数据块: ${parsed.isFinal ? '最终块' : '数据块'}`, 'AI');
+                audioPlayerManager.handleAudioResponse(parsed);
+                if (parsed.isFinal) {
+                    addMessage('system', '模拟AI语音播放完成');
+                }
+            } catch (e) {
+                addMessage('error', `模拟音频处理失败: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+
+</html>
