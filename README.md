@@ -157,3 +157,6 @@ java -jar target/virtual_interview-0.0.1-SNAPSHOT.jar --spring.profiles.active=p
 - 启动失败：检查数据库/Redis/OSS/Iflytek 配置是否正确，网络是否可达。
 - Swagger 无法访问：确认应用端口与 `springdoc` 配置；查看控制台是否有路径冲突。
 - ASR/TTS 不工作：核对 Iflytek 凭据与区域、WebSocket/HTTP 接口地址是否匹配；查看 `asr_audio_logs/` 与 `tts_audio_logs/`。
+### 联系
+需要完整前后端、安卓端（可直接运行/源码）版 联系我
+vx: _echo0z
