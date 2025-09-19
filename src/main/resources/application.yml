@@ -54,8 +54,8 @@ spring:
   mail:
     host: smtp.qq.com
     port: 587
-    username: 3158779947@qq.com
-    password: ***REMOVED*** #授权码
+    username: ${echo.qq.username}
+    password: ${echo.qq.password} #授权码
     properties:
       mail:
         smtp:
@@ -111,23 +111,23 @@ echo:
 
 xunfei:
   api: # 大模型配置
-    key: ""
+    key: ${echo.xunfei.api.key} # 占位符
     url: "https://spark-api-open.xf-yun.com/v1/chat/completions"
     model: "pro-128k"
   rtasr: # speech-to-Text 语音转写 配置 echo 换成其他人的不行
-    appid: ""
-    secret-key: ""
+    appid: ${echo.xunfei.rtasr.appid} # 占位符
+    secret-key: ${echo.xunfei.rtasr.secret-key} # 占位符
     host: "rtasr.xfyun.cn/v1/ws"
   tts: # Text-To-Speech (语音合成) 配置 【yzx的】
     host: "cbm01.cn-huabei-1.xf-yun.com"
-    app-id: ""
-    api-key: ""
-    api-secret: ""
-    vcn: "" # 默认发音人，可以根据需求更改
+    app-id: ${echo.xunfei.tts.app-id} # 占位符
+    api-key: ${echo.xunfei.tts.api-key} # 占位符
+    api-secret: ${echo.xunfei.tts.api-secret} # 占位符
+    vcn: "x5_lingfeiyi_flow"
   knowledge:
-    app-id: ""
-    secret: ""
-    knowledge-base-name: ""
-  face-score: #mj
-    appid: ""
-    apikey: ""
+    app-id: ${echo.xunfei.knowledge.app-id} # 占位符
+    secret: ${echo.xunfei.knowledge.secret} # 占位符
+    knowledge-base-name: "interview"
+  face-score:
+    appid: ${echo.xunfei.face-score.appid} # 占位符
+    apikey: ${echo.xunfei.face-score.apikey} # 占位符
