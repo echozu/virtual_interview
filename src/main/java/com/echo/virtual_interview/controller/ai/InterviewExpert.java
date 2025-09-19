@@ -72,6 +72,8 @@ public class InterviewExpert {
 
                         // 自定义日志 Advisor
                         new MyLoggerAdvisor()
+
+
                         // 增强advisor（即再读一次，耗费token和时间，但更准确）
 //                        ,new ReReadingAdvisor()
                 )

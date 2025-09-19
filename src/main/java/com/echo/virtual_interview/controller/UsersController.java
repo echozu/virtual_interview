@@ -66,6 +66,10 @@ public class UsersController {
         // 验证邮箱验证码
         String email = userRegisterRequest.getEmail();
         String inputCaptcha = userRegisterRequest.getCaptcha();
+        // 安卓的验证码字段
+        if(inputCaptcha == null) {
+            inputCaptcha = userRegisterRequest.getCache();
+        }
 
         // 从 Redis 获取验证码
         String storedCaptcha = redisTemplate.opsForValue().get("captcha:" + email);

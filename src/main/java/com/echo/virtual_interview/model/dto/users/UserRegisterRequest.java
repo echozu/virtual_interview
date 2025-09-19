@@ -22,5 +22,6 @@ public class UserRegisterRequest implements Serializable {
 
     private String email;
     private String captcha; // 验证码
+    private String cache; // 安卓的添加的验证码字段
 
 }
