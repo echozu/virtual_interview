@@ -73,34 +73,33 @@ virtual_interview/
 
 #### 数据库UML图
 
-![](https://imgur.com/zfd80Jj)
+[imgUrl](https://imgur.com/zfd80Jj)
 #### 登录界面
 
-![](https://imgur.com/nTKxY7a)
+[imgUrl](https://imgur.com/nTKxY7a)
 #### 智能对话
 
-![](https://imgur.com/wqnWZ9m)
+[imgUrl](https://imgur.com/wqnWZ9m)
 #### 选择面试
 
-![](https://imgur.com/VXcV3Iy)
+[imgUrl](https://imgur.com/VXcV3Iy)
 #### 面试过程
 
-![](https://imgur.com/0xWynHL)
+[imgUrl](https://imgur.com/0xWynHL)
 #### 分析报告
 
-![](https://imgur.com/qHMpe6m)
+[imgUrl](https://imgur.com/qHMpe6m)
 #### 发布面经
 
-![](https://imgur.com/QPomzd3)
+[imgUrl](https://imgur.com/QPomzd3)
 #### 面经广场
-
-![](https://imgur.com/6Iao3sa)
+[imgUrl](https://imgur.com/6Iao3sa)
 #### 填写简历
 
-![](https://imgur.com/YT0xWKF)
+[imgUrl](https://imgur.com/YT0xWKF)
 #### 综合评估
 
-![](https://imgur.com/GqT00PB)
+[imgUrl](https://imgur.com/GqT00PB)
 ### 快速开始
 
 1) 环境要求
