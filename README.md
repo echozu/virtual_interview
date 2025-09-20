@@ -73,34 +73,34 @@ virtual_interview/
 
 #### 数据库UML图
 
-[Imgur](https://imgur.com/zfd80Jj)
+![](https://imgur.com/zfd80Jj)
 #### 登录界面
 
-[Imgur](https://imgur.com/nTKxY7a)
+![](https://imgur.com/nTKxY7a)
 #### 智能对话
 
-[Imgur](https://imgur.com/wqnWZ9m)
+![](https://imgur.com/wqnWZ9m)
 #### 选择面试
 
-[Imgur](https://imgur.com/VXcV3Iy)
+![](https://imgur.com/VXcV3Iy)
 #### 面试过程
 
-[Imgur](https://imgur.com/0xWynHL)
+![](https://imgur.com/0xWynHL)
 #### 分析报告
 
-[Imgur](https://imgur.com/qHMpe6m)
+![](https://imgur.com/qHMpe6m)
 #### 发布面经
 
-[Imgur](https://imgur.com/QPomzd3)
+![](https://imgur.com/QPomzd3)
 #### 面经广场
 
-[Imgur](https://imgur.com/6Iao3sa)
+![](https://imgur.com/6Iao3sa)
 #### 填写简历
 
-[Imgur](https://imgur.com/YT0xWKF)
+![](https://imgur.com/YT0xWKF)
 #### 综合评估
 
-[Imgur](https://imgur.com/GqT00PB)
+![](https://imgur.com/GqT00PB)
 ### 快速开始
 
 1) 环境要求
@@ -150,5 +150,6 @@ java -jar target/virtual_interview-0.0.1-SNAPSHOT.jar --spring.profiles.active=p
 ### 联系
 需要完整前后端、安卓端（可直接运行/源码）版 联系我
 vx: _echo0z
+
 
 
