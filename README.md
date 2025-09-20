@@ -73,43 +73,43 @@ virtual_interview/
 
 #### 数据库UML图
 
-![图片1.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIFozQ0HwE7IZI0nKWnPiGxUUAYg4gAC5BgAAhwQaVYxTCz2tzZgMDYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIFozQ0HwE7IZI0nKWnPiGxUUAYg4gAC5BgAAhwQaVYxTCz2tzZgMDYE.png)
 
 #### 登录界面
 
-![图片2.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIBozQ0CUn0i0Tf6JVzH2G7bbIv8BQAC4xgAAhwQaVbPkriNEnqyszYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIBozQ0CUn0i0Tf6JVzH2G7bbIv8BQAC4xgAAhwQaVbPkriNEnqyszYE.png)
 
 #### 智能对话
 
-![图片3.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLHxozQ0BQwW2I0R-qQTWGiK83dBCygAC3xgAAhwQaVbi8N4OAdN9uzYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLHxozQ0BQwW2I0R-qQTWGiK83dBCygAC3xgAAhwQaVbi8N4OAdN9uzYE.png)
 
 #### 选择面试
 
-![微信图片_20250919160351_855_4.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKNozQ7Zlc0J3SK7OOLsCQ5ljTRIJAACBhkAAhwQaVZkI1LfzQ0AAa42BA.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKNozQ7Zlc0J3SK7OOLsCQ5ljTRIJAACBhkAAhwQaVZkI1LfzQ0AAa42BA.png)
 
 #### 面试过程
 
-![微信图片_20250919155653_854_4.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIJozQ0H7fEZ5KTVbSpNAe_3n8y0lwAC5RgAAhwQaVZdsEul3xEeNTYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIJozQ0H7fEZ5KTVbSpNAe_3n8y0lwAC5RgAAhwQaVZdsEul3xEeNTYE.png)
 
 #### 分析报告
 
-![图片4.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLH1ozQ0BiO1jW_NsoO7pCwGyPHjq4wAC4BgAAhwQaVZ8GWJLUaN1CjYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLH1ozQ0BiO1jW_NsoO7pCwGyPHjq4wAC4BgAAhwQaVZ8GWJLUaN1CjYE.png)
 
 #### 发布面经
 
-![图片5.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKJozQ7Y2F-B7IcOBymnBeB0cNZQBQACBRkAAhwQaVafAAHkYVF9O5k2BA.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKJozQ7Y2F-B7IcOBymnBeB0cNZQBQACBRkAAhwQaVafAAHkYVF9O5k2BA.png)
 
 #### 面经广场
 
-![微信图片_20250919160715_856_4.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKVozQ8_swEc99aVtMWoJWWXKaozJQACCxkAAhwQaVaGGetIf2dxuTYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKVozQ8_swEc99aVtMWoJWWXKaozJQACCxkAAhwQaVaGGetIf2dxuTYE.png)
 
 #### 填写简历
 
-![微信图片_20250919160909_857_4.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKdozQ-wEXJwKu6QmkvZ-qGkMkSuRgACDRkAAhwQaVY-g7mEgGcqyDYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKdozQ-wEXJwKu6QmkvZ-qGkMkSuRgACDRkAAhwQaVY-g7mEgGcqyDYE.png)
 
 #### 综合评估
 
-![图片6.png](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLH9ozQ0CrFoFmq5qsT9Ule1PmeD1lQAC4hgAAhwQaVbY-A591mAdRzYE.png)
+![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLH9ozQ0CrFoFmq5qsT9Ule1PmeD1lQAC4hgAAhwQaVbY-A591mAdRzYE.png)
 
 ### 快速开始
 
@@ -160,3 +160,4 @@ java -jar target/virtual_interview-0.0.1-SNAPSHOT.jar --spring.profiles.active=p
 ### 联系
 需要完整前后端、安卓端（可直接运行/源码）版 联系我
 vx: _echo0z
+
