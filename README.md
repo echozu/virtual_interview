@@ -73,44 +73,34 @@ virtual_interview/
 
 #### 数据库UML图
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIFozQ0HwE7IZI0nKWnPiGxUUAYg4gAC5BgAAhwQaVYxTCz2tzZgMDYE.png)
-
+[Imgur](https://imgur.com/zfd80Jj)
 #### 登录界面
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIBozQ0CUn0i0Tf6JVzH2G7bbIv8BQAC4xgAAhwQaVbPkriNEnqyszYE.png)
-
+[Imgur](https://imgur.com/nTKxY7a)
 #### 智能对话
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLHxozQ0BQwW2I0R-qQTWGiK83dBCygAC3xgAAhwQaVbi8N4OAdN9uzYE.png)
-
+[Imgur](https://imgur.com/wqnWZ9m)
 #### 选择面试
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKNozQ7Zlc0J3SK7OOLsCQ5ljTRIJAACBhkAAhwQaVZkI1LfzQ0AAa42BA.png)
-
+[Imgur](https://imgur.com/VXcV3Iy)
 #### 面试过程
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLIJozQ0H7fEZ5KTVbSpNAe_3n8y0lwAC5RgAAhwQaVZdsEul3xEeNTYE.png)
-
+[Imgur](https://imgur.com/0xWynHL)
 #### 分析报告
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLH1ozQ0BiO1jW_NsoO7pCwGyPHjq4wAC4BgAAhwQaVZ8GWJLUaN1CjYE.png)
-
+[Imgur](https://imgur.com/qHMpe6m)
 #### 发布面经
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKJozQ7Y2F-B7IcOBymnBeB0cNZQBQACBRkAAhwQaVafAAHkYVF9O5k2BA.png)
-
+[Imgur](https://imgur.com/QPomzd3)
 #### 面经广场
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKVozQ8_swEc99aVtMWoJWWXKaozJQACCxkAAhwQaVaGGetIf2dxuTYE.png)
-
+[Imgur](https://imgur.com/6Iao3sa)
 #### 填写简历
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLKdozQ-wEXJwKu6QmkvZ-qGkMkSuRgACDRkAAhwQaVY-g7mEgGcqyDYE.png)
-
+[Imgur](https://imgur.com/YT0xWKF)
 #### 综合评估
 
-![](https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAAECLH9ozQ0CrFoFmq5qsT9Ule1PmeD1lQAC4hgAAhwQaVbY-A591mAdRzYE.png)
-
+[Imgur](https://imgur.com/GqT00PB)
 ### 快速开始
 
 1) 环境要求
@@ -160,4 +150,5 @@ java -jar target/virtual_interview-0.0.1-SNAPSHOT.jar --spring.profiles.active=p
 ### 联系
 需要完整前后端、安卓端（可直接运行/源码）版 联系我
 vx: _echo0z
+
 
